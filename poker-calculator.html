@@ -1,0 +1,2957 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>德州扑克范围查询 &amp; 胜率计算器</title>
+<style>
+/* ============================== 样式 ============================== */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: #0f1320; color: #dbe3ef;
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  font-size: 13px; line-height: 1.55; padding-bottom: 40px;
+}
+header {
+  padding: 8px 16px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  background: linear-gradient(90deg, #16233a, #101827);
+  border-bottom: 1px solid #24304a;
+}
+.logo { font-size: 16px; font-weight: 700; color: #eaf1ff; }
+.logo .suits { color: #ff7b7b; }
+.badge { font-size: 11px; background: #16303f; color: #6cd2ef; border: 1px solid #2a5a70;
+  border-radius: 10px; padding: 1px 8px; font-weight: 400; }
+.panel { background: #161c28; border: 1px solid #232e42; border-radius: 10px; padding: 10px 12px; margin: 10px; }
+.ttl { font-weight: 700; color: #9db4d6; margin: 2px 0 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hint { color: #7d8ba3; font-size: 12px; font-weight: 400; }
+code { background: #0e1420; border: 1px solid #26324a; border-radius: 4px; padding: 0 4px; color: #8fd3ff; font-size: 12px; }
+select, button, input { font-family: inherit; }
+select { background: #0e1420; border: 1px solid #2b3a56; color: #cfe0f7; border-radius: 5px; padding: 3px 5px; font-size: 12px; }
+button { cursor: pointer; }
+
+/* 顶栏 */
+.topbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.tb { display: flex; align-items: center; gap: 6px; }
+.tb label { color: #8fa2c0; font-size: 12px; white-space: nowrap; }
+.tb input.txt {
+  background: #0e1420; border: 1px solid #2b3a56; color: #e8f0ff; border-radius: 6px;
+  padding: 5px 8px; font-size: 14px; width: 170px; font-family: Consolas, monospace; letter-spacing: 1px;
+}
+.tb input.txt:focus { outline: none; border-color: #4da3ff; box-shadow: 0 0 0 2px rgba(77,163,255,.18); }
+.tb input.txt.bad { border-color: #ff6b6b; }
+button.primary {
+  background: linear-gradient(180deg, #3d8bff, #2f6fd6); border: none; color: #fff;
+  padding: 8px 18px; border-radius: 7px; font-size: 14px; font-weight: 700;
+}
+button.primary:hover { filter: brightness(1.1); }
+button.primary:disabled { background: #2a3750; color: #6c7d99; cursor: not-allowed; }
+button.ghost { background: #1b2437; border: 1px solid #33415e; color: #b9cbe6; padding: 6px 12px; border-radius: 7px; }
+button.ghost:disabled { opacity: .45; cursor: not-allowed; }
+.autoLbl { display: flex; align-items: center; gap: 4px; color: #9db4d6; font-size: 12px; cursor: pointer; user-select: none; }
+/* 折叠区（只隐藏，DOM 保留） */
+.collapsed { display: none; }
+/* 牌桌下方三区域：一样宽、一样高 */
+.threeCols { display: flex; flex-wrap: wrap; align-items: stretch; }
+.threeCols .area { flex: 1 1 0; min-width: 300px; margin: 10px 10px 0 0; display: flex; flex-direction: column; }
+.threeCols .area:last-child { margin-right: 0; }
+/* 窗口太窄时改成竖着排，每块占满一行 */
+@media (max-width: 1250px) {
+  .threeCols { display: block; }
+  .threeCols .area { margin-right: 0; }
+}
+.pickRow { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.pickLabel { font-size: 12px; color: #8fa2c0; width: 58px; flex: 0 0 auto; }
+.threeCols .cardPanel { grid-template-columns: repeat(13, 1fr); gap: 2px; }
+.threeCols .cardBtn { height: 26px; font-size: 10px; }
+/* 设置抽屉 */
+.settingsBox { border-top: 1px dashed #26324a; margin-top: 8px; }
+.dotRed { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ff6b6b; margin-left: 5px; vertical-align: 1px; }
+/* 底池快捷芯片 */
+.chip {
+  background: #1b2437; border: 1px solid #33415e; color: #cfe0f7; border-radius: 999px;
+  padding: 4px 12px; font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.chip:hover { border-color: #4da3ff; background: #22304a; color: #eaf1ff; }
+.chip.active { border-color: #46c98a; background: #1b3a2a; color: #dcffe9; }
+/* 状态行可点 */
+.feltStatus.clickable { cursor: pointer; text-decoration: underline dotted rgba(159,208,255,.5); }
+.feltStatus.clickable:hover { color: #dceaff; }
+.tb input.num { background: #0e1420; border: 1px solid #2b3a56; color: #e8f0ff; border-radius: 6px; padding: 5px 8px; font-size: 14px; width: 84px; font-family: Consolas, monospace; }
+.tb input.num:focus { outline: none; border-color: #4da3ff; }
+/* 范围命中率 */
+.moreToggle { display: flex; gap: 6px; align-items: baseline; margin-top: 9px; padding-top: 7px; border-top: 1px dashed #26324a; color: #9fd0ff; font-size: 12px; cursor: pointer; user-select: none; }
+.moreToggle:hover { color: #dceaff; }
+.hitBox { margin-top: 8px; padding: 7px 8px; background: #121a27; border: 1px solid #24304a; border-radius: 8px; }
+.hitTitle { font-size: 12px; color: #9fd0ff; margin-bottom: 5px; }
+.hitRow { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 12px; }
+.hitName { width: 108px; color: #a9bbd6; flex: 0 0 auto; }
+.hitBar { flex: 1 1 auto; height: 8px; background: #0c1219; border-radius: 4px; overflow: hidden; }
+.hitBar > i { display: block; height: 100%; background: linear-gradient(90deg, #2f6fd6, #46d38a); }
+.hitPct { width: 38px; text-align: right; color: #eaf1ff; font-variant-numeric: tabular-nums; }
+/* 复盘记录 */
+.logHead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.logSummary { font-size: 14px; font-weight: 700; color: #dceaff; }
+table.log { width: 100%; border-collapse: collapse; }
+table.log th, table.log td { padding: 4px 6px; border-bottom: 1px solid #1f2a3e; text-align: left; font-size: 12px; }
+table.log th { color: #7d8ba3; font-weight: 400; }
+.badge-ok { color: #4fe08c; }
+.badge-bad { color: #ff8a8a; }
+.badge-warn { color: #ffcf5c; }
+.logExport { width: 100%; height: 90px; background: #0e1420; border: 1px solid #2b3a56; color: #cfe0f7; border-radius: 6px; padding: 6px; font-family: Consolas, monospace; font-size: 12px; }
+.decideText { font-size: 15px; font-weight: 700; color: #9db4d6; }
+.decideText.go { color: #4fe08c; }
+.decideText.no { color: #ff8a8a; }
+.decideText.mid { color: #ffcf5c; }
+.decideText.stale { opacity: .4; }
+
+/* 主区：左牌桌 + 右侧编辑 */
+.cols { display: flex; align-items: flex-start; }
+.colMain { flex: 1 1 auto; min-width: 0; }
+.colSide { flex: 0 0 auto; width: 320px; }
+@media (max-width: 1180px) { .cols { flex-direction: column; } .colSide { width: 100%; } }
+
+/* ---------------- 牌桌 ---------------- */
+.tableWrap { position: relative; height: 430px; margin: 10px 10px 0; }
+/* 7 人以上：桌子加高、座位卡片缩小，免得互相压住 */
+.tableWrap.dense { height: 520px; }
+.tableWrap.dense .seatBox { min-width: 74px; padding: 3px 4px; }
+.tableWrap.dense .seatEqBox { padding: 0 8px; }
+.tableWrap.dense .posBox { padding: 3px 4px; }
+.tableWrap.dense .seatEq { font-size: 15px; }
+.tableWrap.dense .miniBtn { font-size: 10px; padding: 1px 5px; }
+.felt {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 66%; height: 74%; border-radius: 50% / 50%;
+  background: radial-gradient(ellipse at 50% 42%, #1f6244 0%, #164531 55%, #0e2b1f 100%);
+  border: 11px solid #43301f;
+  box-shadow: inset 0 0 50px rgba(0,0,0,.55), inset 0 0 0 2px rgba(255,255,255,.05), 0 12px 30px rgba(0,0,0,.5);
+}
+.feltCenter {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  text-align: center; width: 300px;
+}
+.feltTitle { color: #a9d6bd; font-size: 12px; margin-bottom: 6px; }
+.boardSlots { display: flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.slot {
+  width: 42px; height: 56px; border-radius: 6px; border: 1px dashed #4a6b58; background: rgba(8,20,14,.55);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; font-weight: 700; font-size: 15px; color: #e8f0ff; line-height: 1.1; user-select: none;
+}
+.slot .suit { font-size: 12px; font-weight: 400; }
+.slot.red { color: #ff8a8a; }
+.slot.filled { border-style: solid; border-color: #6d90a8; background: #1b2b3d; }
+.slot.focus { border-color: #4da3ff; box-shadow: 0 0 0 2px rgba(77,163,255,.3); }
+.feltStatus { margin-top: 8px; color: #9fd0ff; font-size: 12px; min-height: 18px; }
+.bar { height: 6px; background: rgba(0,0,0,.45); border: 1px solid #2c4a3a; border-radius: 5px; overflow: hidden; margin: 6px 12px 0; }
+.bar > div { height: 100%; width: 0; background: linear-gradient(90deg, #2f6fd6, #46d38a); transition: width .12s linear; }
+
+/* 座位：四个独立的框 —— 上=胜率 · 左=下注情况 · 中=角色框 · 右=位置 */
+.seat {
+  position: absolute; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  cursor: pointer; user-select: none;
+}
+.seatRow { display: flex; gap: 4px; align-items: stretch; }
+.seatEqBox {
+  background: #17202e; border: 2px solid #2c3b56; border-radius: 10px;
+  padding: 0 16px; box-shadow: 0 4px 12px rgba(0,0,0,.45); text-align: center;
+}
+.actGrid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 4px;
+  background: #17202e; border: 2px solid #2c3b56; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.45);
+}
+.seatBox {
+  min-width: 92px; padding: 5px 7px; text-align: center; border-radius: 10px;
+  background: #17202e; border: 2px solid #2c3b56; box-shadow: 0 4px 12px rgba(0,0,0,.45);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+}
+.posBox {
+  position: relative; display: flex; align-items: center; padding: 4px 6px; border-radius: 10px;
+  background: #17202e; border: 2px solid #2c3b56; box-shadow: 0 4px 12px rgba(0,0,0,.45);
+}
+.posBox .posBadge { cursor: pointer; }
+.posMenu {
+  display: none; position: absolute; top: 100%; left: 0; z-index: 40; margin-top: 3px;
+  background: #1b2334; border: 1px solid #4da3ff; border-radius: 8px; padding: 4px;
+  box-shadow: 0 10px 24px rgba(0,0,0,.65);
+}
+.posMenu.open { display: block; }
+.posMenuItem {
+  display: block; width: 100%; text-align: left; font-size: 11px; font-family: inherit;
+  padding: 3px 8px; border: none; background: none; color: #cfe0f7; cursor: pointer; border-radius: 5px; white-space: nowrap;
+}
+.posMenuItem:hover { background: #22304a; }
+.posMenuHint { font-size: 10px; color: #7d8ba3; padding: 2px 8px 4px; border-bottom: 1px dashed #26324a; margin-bottom: 3px; }
+.posMenuItem.sel { color: #8fd3ff; font-weight: 700; }
+.seatTop { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.miniBtn {
+  font-size: 11px; line-height: 1.55; padding: 2px 8px; border-radius: 6px; font-family: inherit;
+  border: 1px solid #33415e; background: #1b2437; color: #b9cbe6; cursor: pointer; white-space: nowrap;
+}
+.miniBtn:hover { border-color: #4da3ff; color: #dceaff; background: #22304a; }
+.miniBtn.pot { border-color: #2f5f45; color: #a8e6c3; background: #16281f; font-weight: 700; }
+.miniBtn.pot:hover { border-color: #46c98a; color: #dcffe9; background: #1b3a2a; }
+.miniBtn.fold { border-color: #4a3540; color: #d7a9b6; background: #241820; }
+.miniBtn.fold:hover { border-color: #ff7bb0; color: #ffd9e6; }
+.miniBtn.sel { border-color: #4da3ff; background: #22304a; color: #dceaff; font-weight: 700; }
+.seat:hover .seatEqBox, .seat:hover .actGrid, .seat:hover .seatBox, .seat:hover .posBox { border-color: #4da3ff; }
+.seat.selected { filter: drop-shadow(0 0 6px rgba(77,163,255,.9)); }
+.seat.selected .seatBox, .seat.selected .seatEqBox { border-color: #4da3ff; }
+.seat.me .seatBox { border-color: #2f8f5f; }
+.seat.folded { opacity: .42; }
+.seat.folded .seatEq { color: #8fa2c0; }
+.seatName { font-size: 12px; color: #b9cbe6; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.posBadge { font-size: 10px; color: #cfe0f7; background: #20304d; border: 1px solid #35507a; border-radius: 8px; padding: 0 5px; font-weight: 400; cursor: help; }
+.seatState { font-size: 11px; color: #8fa2c0; margin-top: 2px; height: 17px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.seatEq { font-size: 19px; font-weight: 800; color: #eaf1ff; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.seatEq.stale { opacity: .35; }
+.seatEq small { font-size: 11px; font-weight: 400; color: #8fa2c0; }
+.seatCards { display: flex; gap: 3px; justify-content: center; margin-top: 2px; }
+.miniCard { font-size: 12px; font-weight: 700; background: #101a28; border: 1px solid #2c3b56; border-radius: 4px; padding: 0 4px; }
+.miniCard.red { color: #ff8a8a; }
+
+/* ---------------- 右侧：座位编辑 ---------------- */
+.seHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.seTitle { font-weight: 700; color: #dceaff; font-size: 14px; }
+.seEq { font-size: 22px; font-weight: 800; color: #4fe08c; font-variant-numeric: tabular-nums; }
+.seRow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 7px; }
+.plabel { font-size: 11px; color: #6f7f9c; min-width: 52px; }
+.pbtn {
+  font-size: 12px; padding: 4px 9px; border-radius: 6px; font-family: inherit;
+  border: 1px solid #33415e; background: #1b2437; color: #b9cbe6; cursor: pointer;
+}
+.pbtn:hover { border-color: #4da3ff; color: #dceaff; background: #22304a; }
+.pbtn.big { font-size: 13px; padding: 6px 14px; font-weight: 700; }
+.pbtn.pos { border-color: #2f5f45; color: #a8e6c3; background: #16281f; }
+.pbtn.pos:hover { border-color: #46c98a; color: #dcffe9; background: #1b3a2a; }
+.pbtn.fold { border-color: #4a3540; color: #d7a9b6; background: #241820; }
+.pbtn.fold:hover { border-color: #ff7bb0; color: #ffd9e6; }
+.pbtn.sel { border-color: #4da3ff; background: #22304a; color: #dceaff; }
+.seInput {
+  background: #0e1420; border: 1px solid #2b3a56; color: #cfe0f7; border-radius: 5px;
+  padding: 5px 6px; font-size: 12px; font-family: Consolas, monospace; width: 100%;
+}
+.seInput:focus { outline: none; border-color: #4da3ff; }
+.comboInfo { font-size: 11px; color: #7d8ba3; margin-top: 4px; }
+.comboInfo b { color: #9fd0ff; font-weight: 700; }
+.seCards { display: flex; gap: 6px; align-items: center; }
+
+/* 结果小表 */
+table.res { width: 100%; border-collapse: collapse; margin-top: 6px; }
+table.res th, table.res td { padding: 3px 4px; text-align: right; border-bottom: 1px solid #1f2a3e; font-size: 12px; }
+table.res th { color: #7d8ba3; font-weight: 400; }
+table.res th:first-child, table.res td:first-child { text-align: left; }
+table.res td.eq { font-weight: 700; color: #eaf1ff; font-variant-numeric: tabular-nums; }
+table.res .pdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+
+/* 点选牌面 */
+.cardPanel { display: grid; grid-template-columns: repeat(13, 1fr); gap: 3px; }
+.cardBtn {
+  display: flex; align-items: center; justify-content: center; gap: 1px;
+  height: 34px; border-radius: 5px; border: 1px solid #2a3750; background: #1d2537;
+  cursor: pointer; font-size: 12px; color: #e6edf8; padding: 0; font-family: inherit;
+}
+.cardBtn.red { color: #ff8a8a; }
+.cardBtn:hover { border-color: #4da3ff; background: #24304a; }
+.cardBtn.used { opacity: .18; cursor: not-allowed; }
+.cardBtn.used:hover { border-color: #2a3750; background: #1d2537; }
+
+/* 13x13 范围图 */
+.rangeGrid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 2px; }
+.gc {
+  height: 24px; border-radius: 4px; border: 1px solid #232e42; background: #1a2130;
+  font-size: 9px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #8d9bb5; user-select: none; overflow: hidden;
+}
+.gc:hover { border-color: #4da3ff; color: #cfe4ff; }
+.gc.on { background: #1c4d34; border-color: #39c07a; color: #c8ffe2; }
+.gc.part { background: #4a3c14; border-color: #b7a13c; color: #ffe9a8; }
+.gc.pair { font-weight: 700; }
+.gridLegend { display: flex; gap: 14px; margin-top: 6px; font-size: 12px; color: #7d8ba3; flex-wrap: wrap; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.dot.on { background: #2b8a58; border: 1px solid #39c07a; }
+.dot.part { background: #6b5a1c; border: 1px solid #b7a13c; }
+.dot.off { background: #1a2130; border: 1px solid #232e42; }
+
+/* Tabs */
+.tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.tabBtn { background: #141b28; border: 1px solid #24304a; color: #93a6c4; padding: 6px 14px; border-radius: 7px; font-size: 13px; }
+.tabBtn.active { background: #1d2b45; border-color: #4da3ff; color: #dceaff; font-weight: 700; }
+.tabPane { display: none; }
+.tabPane.active { display: block; }
+
+/* 位置范围表 */
+.posRows { display: flex; flex-direction: column; gap: 8px; }
+.posRow { display: flex; align-items: center; gap: 10px; }
+.posName { width: 118px; color: #b9cbe6; font-size: 12px; flex: 0 0 auto; text-align: right; }
+.miniGrid { display: grid; grid-template-columns: repeat(13, 1fr); gap: 1px; width: 100%; max-width: 560px; }
+.mc { height: 17px; border-radius: 3px; background: #161d2b; border: 1px solid #1f2a3e; font-size: 7.5px; color: #55637d; display: flex; align-items: center; justify-content: center; }
+.mc.raise { background: #7a2530; border-color: #c0475a; color: #ffd9de; font-weight: 700; }
+.mc.call { background: #1e5a3c; border-color: #3ba46c; color: #d6ffe8; font-weight: 700; }
+.posInfo { color: #7d8ba3; font-size: 11px; min-width: 108px; }
+
+/* Outs 速查 */
+.outsGrid { display: flex; gap: 20px; flex-wrap: wrap; }
+.outsCol { flex: 1 1 320px; }
+.kv { display: flex; gap: 8px; align-items: baseline; margin: 4px 0; }
+.kv .k { color: #7d8ba3; font-size: 12px; min-width: 92px; }
+.kv .v { color: #eaf1ff; font-weight: 700; }
+.kv .v.good { color: #4fe08c; }
+.kv .v.warn { color: #ffcf5c; }
+.kv .v.bad { color: #ff8080; }
+.outCards { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0 8px; }
+.ocard { font-size: 11px; padding: 1px 5px; border-radius: 4px; background: #1b2540; border: 1px solid #33415e; font-family: Consolas, monospace; }
+.ocard.red { color: #ff8a8a; }
+.potRow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.potRow input { background: #0e1420; border: 1px solid #2b3a56; color: #e8f0ff; border-radius: 5px; padding: 4px 6px; width: 84px; font-family: Consolas, monospace; }
+
+/* 表格（术语/说明） */
+table.doc { width: 100%; border-collapse: collapse; }
+table.doc th, table.doc td { padding: 5px 8px; border-bottom: 1px solid #1f2a3e; text-align: left; vertical-align: top; }
+table.doc th { color: #8fa2c0; }
+table.doc td:first-child { white-space: nowrap; color: #9fd0ff; font-weight: 700; }
+
+/* 提示条 */
+.toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+  background: #1d2b45; border: 1px solid #4da3ff; color: #e8f2ff; padding: 9px 18px;
+  border-radius: 8px; opacity: 0; pointer-events: none; transition: all .22s ease; z-index: 100;
+  box-shadow: 0 6px 24px rgba(0,0,0,.45); max-width: 80vw;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { border-color: #ff6b6b; background: #3a1c22; }
+
+.tag3 { font-size: 10px; color: #d7a9b6; background: #2a1b24; border: 1px solid #4a3540; border-radius: 8px; padding: 0 5px; margin-left: 4px; font-weight: 400; }
+.tag2 { font-size: 10px; color: #8fd3ff; background: #17324a; border: 1px solid #2a5a80; border-radius: 8px; padding: 0 5px; margin-left: 4px; font-weight: 400; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span class="suits">♠♥♦♣</span> 德州扑克范围查询 &amp; 胜率计算器</div>
+  <span class="badge">离线单文件 · 数据不出本机</span>
+  <span class="hint">① 填我的手牌 ② 点他座位上的「进池」/「弃牌」 ③ 胜率自动出来</span>
+</header>
+
+<!-- 顶栏：只留实战必需的三个 -->
+<section class="panel" style="padding:8px 12px">
+  <div class="topbar">
+    <div class="tb"><label>我的手牌</label><input id="myHandInput" class="txt" spellcheck="false" placeholder="A♠K♠" title="输入你的两张牌，也可以展开「手动输入」点牌面选牌"></div>
+    <div class="tb"><label>公共牌</label><input id="boardInput" class="txt" spellcheck="false" placeholder="A♥7♣2♦（可留空）" title="翻牌 3 张 / 转牌 4 张 / 河牌 5 张；不填就是翻前"></div>
+    <div class="tb">
+      <span class="hint">打完一手 → 点下面 ① 号区域的「下一手 →」</span>
+    </div>
+    <div class="tb" style="margin-left:auto">
+      <button id="settingsBtn" class="ghost" title="人数、我坐哪、计算方式等">⚙ 设置<span id="settingsDot" class="dotRed" style="display:none"></span></button>
+    </div>
+  </div>
+  <div id="settingsBox" class="settingsBox collapsed">
+    <div class="topbar" style="margin-top:8px">
+      <div class="tb"><label>人数</label><select id="playerCountSel" title="桌上几个人（6 人桌就选 6 人）"></select></div>
+      <div class="tb"><label>我坐</label><select id="myPosSel" title="你坐在哪个位置？选好后其他座位的位置会自动排好；每打完一手点「下一手」会自动往前转"></select></div>
+      <div class="tb">
+        <button id="runBtn" class="primary">开始计算</button>
+        <button id="cancelBtn" class="ghost" disabled>取消</button>
+      </div>
+      <div class="tb">
+        <select id="modeSel" title="自动：能精确算的就精确算，算不动的用模拟">
+          <option value="auto">自动（推荐）</option>
+          <option value="mc">强制模拟</option>
+          <option value="exact">强制精确枚举</option>
+        </select>
+        <select id="speedSel" title="模拟次数越多越准，但更慢">
+          <option value="fast">快速</option>
+          <option value="normal" selected>标准</option>
+          <option value="fine">精细（较慢）</option>
+        </select>
+        <label class="autoLbl" title="改动手牌/范围/公共牌后自动重新计算，不用点按钮"><input type="checkbox" id="autoRun" checked> 自动计算（推荐开着）</label>
+      </div>
+    </div>
+    <div class="hint" style="margin-top:6px">平时不用打开这里：手牌和公共牌打完自动算，「下一手」自动换位。</div>
+  </div>
+</section>
+
+<div class="cols">
+  <div class="colMain">
+    <!-- 牌桌 -->
+    <div class="tableWrap" id="tableWrap">
+      <div class="felt"></div>
+      <div class="feltCenter">
+        <div class="feltTitle" id="feltTitle">6 人桌 · 我坐大盲</div>
+        <div id="boardSlots" class="boardSlots"></div>
+        <div class="bar"><div id="barFill"></div></div>
+        <div class="feltStatus clickable" id="statusLine" title="点这里重新计算">点座位 → 选他这一手怎么打的 → 胜率自动出来</div>
+      </div>
+      <!-- 座位由 JS 生成 -->
+    </div>
+
+    <!-- 牌桌下方：三个区域（左：牌库选择器 · 中：听牌 Outs · 右：胜率/决策） -->
+    <div class="threeCols">
+      <!-- ① 牌库选择器 -->
+      <section class="panel area">
+        <div class="ttl">① 点这里选牌
+          <button id="nextHandBtn" class="ghost" style="margin-left:auto; padding:4px 12px"
+            title="打完一手点这个：按钮位置往前转一格（你会变成下一个位置），同时清空手牌和公共牌，对手的范围保留">下一手 →</button>
+        </div>
+        <div class="pickRow" style="margin-bottom:6px">
+          <input id="situationInput" class="seInput" spellcheck="false"
+            placeholder="一行话填全：我 BTN A♠K♠ | 公共牌 A♥7♣2♦ | CO 加注"
+            title="用 | 分隔几段。能认：位置（UTG/中位/关煞/按钮/小盲/大盲）、动作（跟注/加注/底池/3bet/全下/弃牌/随机）、手牌、公共牌。回车生效">
+        </div>
+        <div class="hint" id="focusHint" style="margin-bottom:5px"></div>
+        <div class="pickRow"><span class="pickLabel">我的手牌</span><div id="myHandSlots" class="boardSlots"></div></div>
+        <div class="pickRow"><span class="pickLabel">公 共 牌</span><div id="boardSlots2" class="boardSlots"></div></div>
+        <div id="cardPanel" class="cardPanel"></div>
+        <div class="hint" style="margin-top:5px">
+          先点上面任意一个空牌位（我的手牌 / 公共牌 / 对手座位上的牌位），再在这里点牌。<br>选完两张手牌会自动跳到公共牌，接着点翻牌就行；想改手牌先点一下「我的手牌」的牌位。
+          点错了按 <code>Esc</code> 清空；灰掉的牌已被占用。
+        </div>
+      </section>
+
+      <!-- ② 听牌 Outs -->
+      <section class="panel area">
+        <div class="ttl">② 听牌 Outs <span class="hint">读我的手牌 + 公共牌</span></div>
+        <div id="outsMain"></div>
+      </section>
+
+      <!-- ③ 胜率 / 该不该跟 -->
+      <section class="panel area">
+        <div class="ttl">③ 胜率 / 该不该跟</div>
+        <div class="topbar">
+          <div class="tb"><label>他下注</label>
+            <button class="chip" data-bet="0.5" title="对手下注半个底池 → 跟注需要 25% 胜率（按底池 100 换算，结论只看比例）">½ 池</button>
+            <button class="chip" data-bet="0.666" title="对手下注三分之二底池 → 跟注需要 28.6% 胜率">⅔ 池</button>
+            <button class="chip" data-bet="1" title="对手下注一个底池 → 跟注需要 33.3% 胜率">满池</button>
+          </div>
+          <div class="tb"><label>底池</label><input id="potInput" class="num" value="100"></div>
+          <div class="tb"><label>我跟</label><input id="callInput" class="num" value="50"></div>
+        </div>
+        <div id="decideText" class="decideText" style="margin-top:6px">选「他下注多少」，或直接填底池和跟注额，算完胜率就告诉你该不该跟。</div>
+        <div id="results" style="margin-top:8px"></div>
+        <div id="hitBoxWrap"></div>
+        <div class="topbar" style="margin-top:8px">
+          <button id="logCallBtn" class="ghost" title="把这一手记下来（牌、对手范围、胜率、你的决定），打完牌去「复盘记录」看">我跟了</button>
+          <button id="logFoldBtn" class="ghost" title="把这一手记下来，打完牌去「复盘记录」看">我弃了</button>
+          <span class="hint">打完去「复盘记录」看你是不是总在亏钱跟注</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- 范围图（研究范围时才展开） -->
+    <section class="panel" style="margin-top:0">
+      <div class="ttl" style="cursor:pointer" id="manualToggle">
+        <span id="manualArrow">▸</span> 范围图 <span class="hint">点格子改对手范围 · 正在编辑：<b id="gridTargetName" style="color:#9fd0ff"></b></span>
+      </div>
+      <div id="manualBox" class="collapsed">
+        <div id="rangeGrid" class="rangeGrid" style="max-width:520px"></div>
+        <div class="gridLegend">
+          <span><i class="dot on"></i>已选中</span>
+          <span><i class="dot part"></i>部分组合</span>
+          <span class="hint" id="gridInfo"></span>
+        </div>
+        <div class="hint" style="margin-top:4px">
+          格子名字：<b>AA</b>=一对A · <b>AKs</b>=A 和 K 同花 · <b>AKo</b>=A 和 K 不同花（s/o 不是花色符号）
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="colSide">
+    <section class="panel" style="margin-left:0">
+      <div class="ttl">选中座位 <span class="hint">点牌桌上任意座位</span></div>
+      <div id="seatEditor"></div>
+    </section>
+  </div>
+</div>
+
+<!-- 附加功能 -->
+<section class="panel">
+  <div class="tabs">
+    <button class="tabBtn active" data-tab="pos">翻前位置范围表</button>
+    <button class="tabBtn" data-tab="log">复盘记录</button>
+    <button class="tabBtn" data-tab="help">使用说明 / 术语</button>
+  </div>
+
+  <div id="tab-log" class="tabPane">
+    <div class="hint" style="margin-bottom:8px">
+      打牌时点牌桌下方的 <b>「我跟了」/「我弃了」</b> 把每一手记下来。这里会告诉你：
+      <b>你有多少次是在胜率不够的情况下跟注</b>（长期亏钱），又有多少次<b>其实该跟却弃了</b>（弃得太多）。
+      记录存在浏览器本地，不联网。
+    </div>
+    <div id="logBox"></div>
+  </div>
+
+  <div id="tab-pos" class="tabPane active">
+    <div class="hint" style="margin-bottom:8px">
+      6 人桌 100 大盲常规打法参考范围（<b>不是 GTO 精确解</b>，仅供入门参考）。点「载入」把它填给选中的座位。
+      载入目标：<select id="posTargetSel"></select>
+    </div>
+    <div class="posRows" id="posRows"></div>
+  </div>
+
+  <div id="tab-outs" class="tabPane" style="display:none">
+    <div class="hint">听牌 Outs 已经搬到牌桌下方中间那个区域了，不用再切标签页。</div>
+  </div>
+
+  <div id="tab-help" class="tabPane">
+    <div class="ttl">30 秒学会：页面就三块</div>
+    <div class="hint" style="margin-bottom:6px">
+      <b>上半 = 牌桌</b>：填牌、点座位上的按钮，胜率直接写在每个座位上。<br>
+      <b>下半左边 ① = 选牌</b>：点「我的手牌」或「公共牌」的空位，再点下面的牌——手牌和公共牌都在这里选（也可以直接在顶栏打字）。<br>
+      <b>下半中间 ② = 听牌 Outs</b>：自动读你的手牌和公共牌，告诉你还有几张牌能救你。<br>
+      <b>下半右边 ③ = 胜率 / 该不该跟</b>：点「他下注多少」的芯片 → 直接告诉你<b>建议跟注还是弃牌</b>；下面还有每个玩家的胜率和「对手范围中了什么」。<br>
+      每打完一手点 ① 号选牌区右上角的 <b>下一手 →</b>：位置自动往前转、手牌清空、对手范围保留。
+    </div>
+
+    <div class="ttl" style="margin-top:10px">每个座位是 4 个独立的框</div>
+    <div class="hint" style="margin-bottom:6px">
+      <pre style="color:#a9bbd6;font-size:11px;line-height:1.5;margin:4px 0">              ┌─ 15.8% ─┐                    ← 上框：胜率
+┌───────┐   ┌──────────┐   ┌──────┐
+│ 跟注 加注│   │  玩家2   │   │ 枪口位 │        ← 右框：位置
+│ 底池 3bet│   │ 还没进池 │   └──────┘
+│ 全下 弃牌│   └──────────┘
+└───────┘
+ 左框：下注情况   中框：角色框</pre>
+      <b>左边 = 下注情况（真实动作）</b>：<b>跟注</b>（他平跟进来）· <b>加注</b>（按他的位置估）· <b>底池</b>（他下/加了一个底池，打得很凶）· <b>3bet</b>（他反加注）· <b>全下</b> · <b>弃牌</b>（他没玩这手）。<br>
+      <b>中框（角色框）</b>是玩家号码和状态（还没进池 / 弃牌 / 多少种组合），<b>右框</b>单独显示他的<b>位置</b>（中文）——<b>点一下能改</b>：选一个位置，其他座位按顺序自动跟着转，亮牌时中框里还会显示他的两张牌。<br>
+      想按他的<b>打法</b>微调（紧/常规/松/跟注站/随机）、输他的具体手牌、手动指定位置 → 点一下座位，右侧面板里有。
+    </div>
+
+    <div class="ttl" style="margin-top:12px">照着做：完整实战流程（12 个场景）</div>
+    <table class="doc">
+      <tr><th style="width:150px">什么时候</th><th style="width:250px">你怎么做</th><th>看什么 / 怎么判断</th></tr>
+      <tr><td>1. 翻前，前面全弃牌</td><td>打自己两张牌 → 看自己座位上的胜率</td><td>对手默认是「枪口位」范围，换点他的座位点 <b>随机</b> 可以看「对上随便什么牌」的胜率。太低的牌就别玩</td></tr>
+      <tr><td>2. 翻前，有人加注</td><td>点他座位 → <b>进池</b>（觉得他紧再点 <b>紧</b>）</td><td>看下方那句结论：<b>建议跟注</b> 还是 <b>建议弃牌</b>。记住先填「他下注多少」的芯片</td></tr>
+      <tr><td>3. 翻前，我在大盲被加注</td><td>同上（座位标签写着你是什么位置）</td><td>大盲本来就是「防守」位置，需要的胜率比你想的低（点了芯片就知道）</td></tr>
+      <tr><td>4. 翻牌后，我中了顶对</td><td>填 3 张公共牌 → 点对手座位，看 <b>「中了什么」</b></td><td>他「什么都没中」比例高、你顶对 → 可以放心下注；他「顶对以上」超过一半 → 小心</td></tr>
+      <tr><td>5. 翻牌后，我什么都没中</td><td>直接看下方结论</td><td>胜率通常不够 → 弃。别因为「都投钱了」硬跟</td></tr>
+      <tr><td>6. 翻牌后，我有听牌</td><td>打开「听牌 Outs 速查」标签页</td><td>看 outs 张数和成牌概率，再和「需要胜率」比</td></tr>
+      <tr><td>7. 转牌 / 河牌来了</td><td>公共牌框补第 4、5 张</td><td>河牌时会自动用「精确枚举」（零误差）</td></tr>
+      <tr><td>8. 多个人一起看翻牌</td><td>其他进池的座位也都点 <b>进池</b></td><td>人越多你的胜率越低，这是正常的，别以为算错了</td></tr>
+      <tr><td>9. 有人全下</td><td>点他座位 → 「更多选项」→ <b>全下</b></td><td>全下的人范围极窄（大概只有 QQ 以上和 AK），别用宽范围估他</td></tr>
+      <tr><td>10. 我加注被反加（3bet）</td><td>点他座位 → 「更多选项」→ <b>3bet</b></td><td>3bet 范围窄，你那些边缘牌该弃就弃</td></tr>
+      <tr><td>11. 这一手打完了</td><td>点 <b>下一手 →</b></td><td>位置自动轮转，你不用管</td></tr>
+      <tr><td>12. 打完一场</td><td>打牌时点 <b>我跟了 / 我弃了</b>；结束后看「复盘记录」</td><td>「亏钱跟注」次数就是你最该改的习惯</td></tr>
+    </table>
+    <div class="hint" style="margin-top:6px">
+      快捷键：按 <code>P</code> = 让选中座位进池 · <code>F</code> = 弃牌 · <code>R</code> = 随机（正在打字时不生效）。
+      状态行点一下 = 重新计算（自动计算被关掉时的兜底）。
+    </div>
+
+    <div class="ttl" style="margin-top:12px">所有按钮一览</div>
+    <table class="doc">
+      <tr><th style="width:150px">按钮在哪</th><th>什么时候点</th></tr>
+      <tr><td>座位卡片左侧：<b>加注</b></td><td>他加注了 → 自动按<b>他这个座位的位置</b>填参考范围</td></tr>
+      <tr><td>座位卡片左侧：<b>跟注 / 底池 / 3bet / 全下</b></td><td>按他真实的动作填对应范围（跟注最宽 → 全下最窄）</td></tr>
+      <tr><td>座位卡片左侧：<b>弃牌</b></td><td>他没玩这手牌 → 座位变灰、不参与计算</td></tr>
+      <tr><td>座位卡片右侧：<b>紧 / 常规 / 松 / 跟注站 / 随机</b></td><td>覆盖位置范围，按他的风格估（约 4% / 15% / 25% / 73% / 100% 的牌）</td></tr>
+      <tr><td>右侧面板：<b>更多选项 ▾</b></td><td>展开后是 <b>3bet / 全下</b>（他反加了/全下了）和 <b>手动指定位置</b>（一般不用）</td></tr>
+      <tr><td>右侧面板：手牌输入框</td><td>他亮牌了、或你想指定他的具体两张牌：打字 <code>A♠K♠</code></td></tr>
+    </table>
+
+    <div class="ttl" style="margin-top:12px">一行话粘贴（最快的输入方式）</div>
+    <div class="hint" style="margin-bottom:6px">
+      ① 号选牌区最上面的输入框，把整局用一行话粘进去、回车，<b>全部自动填好</b>：
+    </div>
+    <table class="doc">
+      <tr><th style="width:330px">你输入</th><th>会填成</th></tr>
+      <tr><td><code>我 BTN A♠K♠ | 公共牌 A♥7♣2♦ | CO 加注</code></td><td>我坐按钮位、手牌 A♠K♠、公共牌 A♥7♣2♦、关煞位那个座位标成「加注」</td></tr>
+      <tr><td><code>我大盲 AsKs | 翻牌 Ah7c2d | 按钮位 全下 | 小盲 跟注</code></td><td>中文位置和动作都认（全下/全押/推了 一样）</td></tr>
+      <tr><td><code>A♠K♠ | A♥7♣2♦ | CO raise</code></td><td>不写关键词也行：按张数判断（2 张=手牌，3~5 张=公共牌）</td></tr>
+    </table>
+    <div class="hint" style="margin-top:6px">
+      位置：UTG/枪口位 · 中位 · 关煞位 · 按钮位 · 小盲 · 大盲
+      动作：跟注 · 加注 · 底池 · 3bet · 全下 · 弃牌 · 随机<br>
+      <b>注意</b>：写了对手动作时，没提到的座位会自动算「还没进池」——因为这行话描述的是完整局面。
+    </div>
+
+    <div class="ttl" style="margin-top:12px">范围命中率（在 ③ 号区域，回答「我这手够不够强」）</div>
+    <div class="hint" style="margin-bottom:6px">
+      翻牌发出来后，③ 号区域（胜率下面）会显示「对手范围在 A♥7♣2♦ 上中了什么」——点哪个座位就显示哪个座位的（点我方则自动显示在池对手的）：
+    </div>
+    <table class="doc">
+      <tr><th style="width:170px">分类</th><th>意思</th></tr>
+      <tr><td>强牌（两对以上）</td><td>两对、三条、顺子、同花等——他要是下注，你要小心</td></tr>
+      <tr><td>顶对 / 超对</td><td>中了牌面最大的那张（或手里的大对子比牌面都大）</td></tr>
+      <tr><td>中/小对子</td><td>中了小的那张，或者手里的小对子</td></tr>
+      <tr><td>听牌（还没成对）</td><td>没成对，但有同花听或顺子听——现在还不强，但有希望</td></tr>
+      <tr><td>什么都没中</td><td>完全没碰上牌面</td></tr>
+    </table>
+    <div class="hint" style="margin-top:6px">
+      用法：如果「强牌」比例很低、「什么都没中」很高，说明这个牌面没帮到他——你的顶对就非常强，可以放心下注；
+      反过来如果「顶对/超对以上」加起来超过一半，你的一对就不值钱了。
+    </div>
+
+    <div class="ttl" style="margin-top:12px">复盘记录（打完牌看，能真正提升水平）</div>
+    <div class="hint" style="margin-bottom:6px">
+      打牌时拿不准的时候，点牌桌下方的 <b>「我跟了」</b> 或 <b>「我弃了」</b>，工具会把这一手记下来
+      （你的牌、牌面、对手范围、你的胜率、跟注需要的胜率、你的决定）。打完牌打开「复盘记录」标签页：
+    </div>
+    <table class="doc">
+      <tr><th style="width:170px">你会看到</th><th>意思</th></tr>
+      <tr><td>亏钱跟注 N 次</td><td>你胜率不够却跟了注——这是新手最烧钱的习惯</td></tr>
+      <tr><td>弃错了 N 次</td><td>其实胜率够、该跟，你却弃了——说明你弃得太多</td></tr>
+      <tr><td>跟得对 / 弃得对</td><td>按底池赔率算，这两类决定是赚的</td></tr>
+    </table>
+    <div class="hint" style="margin-top:6px">
+      记录存在浏览器本地（不联网）。可以点「生成导出文本」复制出去存成表格。
+    </div>
+
+    <div class="ttl" style="margin-top:12px">术语速查（小白版）</div>
+    <table class="doc">
+      <tr><th style="width:150px">词</th><th>大白话解释</th></tr>
+      <tr><td>胜率（Equity）</td><td>双方把牌亮出来、把剩下的公共牌都发完，平均下来你能赢多少比例的底池。平局的底池按人数平分后也折算进胜率。</td></tr>
+      <tr><td>独占胜 / 平局 / 败率</td><td>单独赢下（没人并列）/ 和别人并列赢平分底池 / 一点没赢到。三者相加 = 100%。</td></tr>
+      <tr><td>范围（Range）</td><td>对手不是固定某两张牌，而是「他可能拿的一批起手牌」。13×13 方格图就是 169 种起手牌型：绿格=算进他的范围。</td></tr>
+      <tr><td>组合数（Combos）</td><td>这个范围总共包含多少种「具体的两张牌」。AA 一格 = 6 种，AKs = 4 种，AKo = 12 种，全部 169 格 = 1326 种。</td></tr>
+      <tr><td>进池 / 弃牌</td><td>进池 = 他花钱参与这一手（加注或跟注）；弃牌 = 他不要这手牌了，不参与计算。</td></tr>
+      <tr><td>蒙特卡洛模拟</td><td>电脑随机发牌几万次，统计谁赢得多。次数越多越准，但越慢。结果会标注误差范围。</td></tr>
+      <tr><td>精确枚举</td><td>把所有可能的发牌都算一遍，结果没有误差（河牌圈等局面小时特别快）。</td></tr>
+      <tr><td>听牌 Outs</td><td>「还有几张牌能让我变强」。比如同花听牌剩 9 张同花色牌能成同花，就是 9 个 outs。</td></tr>
+      <tr><td>底池赔率</td><td>花多少钱去搏多大的底池：需要胜率 = 跟注额 ÷ 跟注后的底池总额，和你的成牌概率比一比就知道划不划算。</td></tr>
+      <tr><td>位置名</td><td>枪口位=第一个说话（最难受）· 中位 · 关煞位 · 按钮位=最后一个说话（最舒服）· 小盲 · 大盲</td></tr>
+    </table>
+
+    <div class="ttl" style="margin-top:12px">快速输入语法速查</div>
+    <table class="doc">
+      <tr><th style="width:200px">你输入</th><th>含义</th></tr>
+      <tr><td>A♠K♦（也可写 AsKd）</td><td>黑桃 A + 方块 K，具体两张牌</td></tr>
+      <tr><td>AKs</td><td>所有 AK 且<b>同花</b>（A 和 K 花色相同，共 4 种组合）</td></tr>
+      <tr><td>AKo</td><td>所有 AK 但<b>不同花</b>（共 12 种组合）</td></tr>
+      <tr><td>AK / AKs+AKo</td><td>所有 AK（同花 + 不同花共 16 种）</td></tr>
+      <tr><td>JJ+</td><td>JJ、QQ、KK、AA（JJ 及以上所有对子）</td></tr>
+      <tr><td>AQs+</td><td>AQs、AKs</td></tr>
+      <tr><td>ATs-A5s</td><td>ATs、A9s、A8s、A7s、A6s、A5s（顺序反着写也行）</td></tr>
+      <tr><td>T9s-54s</td><td>对角线范围：T9s、98s、87s、76s、65s、54s</td></tr>
+      <tr><td>随机 / 弃牌 / 清空</td><td>任意两张牌 / 这个座位弃牌 / 清空公共牌</td></tr>
+    </table>
+    <div class="hint" style="margin-top:8px">
+      <b>花色写法</b>：图案 ♠♥♦♣ 和字母 s(♠黑桃) h(♥红心) d(♦方块) c(♣梅花) 都可以，打不出来就从这行复制。
+      点数用 <code>A K Q J T 9 8 7 6 5 4 3 2</code>（T 就是 10）。
+    </div>
+    <div class="hint" style="margin-top:10px">
+      提示：胜率计算只考虑「牌力」，不模拟下注策略，也不能保证赢钱。仅供学习与娱乐参考。
+    </div>
+  </div>
+</section>
+
+<div id="toast" class="toast"></div>
+
+
+<script id="core">
+/* ==========================================================================
+   CORE（纯计算，不碰页面）——Node 测试脚本会抽取这一段直接执行
+   ========================================================================== */
+(function () {
+'use strict';
+
+var RANK_CHARS = '23456789TJQKA';            // rank 0..12 → '2'..'A'
+var SUIT_CHARS = 'shdc';                     // suit 0..3 → 黑桃/红心/方块/梅花
+var SUIT_SYMBOLS = ['\u2660', '\u2665', '\u2666', '\u2663'];
+var CATEGORY_NAMES = ['高牌', '一对', '两对', '三条', '顺子', '同花', '葫芦', '四条', '同花顺'];
+
+var rankCharToIdx = {};
+for (var _i = 0; _i < 13; _i++) rankCharToIdx[RANK_CHARS[_i]] = _i;
+
+function makeCard(r, s) { return (r << 2) | s; }
+function cardRank(c) { return c >> 2; }
+function cardSuit(c) { return c & 3; }
+function cardName(c) { return RANK_CHARS[c >> 2] + SUIT_CHARS[c & 3]; }
+function cardDisplay(c) { return RANK_CHARS[c >> 2] + SUIT_SYMBOLS[c & 3]; }
+function isRedCard(c) { var s = c & 3; return s === 1 || s === 2; }
+
+/* ---------- 顺子查找表：13 位点数掩码 → 顺子最高张（0=没有顺子） ---------- */
+var BITS_TO_STRAIGHT = new Uint8Array(8192);
+(function () {
+  var wheel = (1 << 12) | (1 << 3) | (1 << 2) | (1 << 1) | (1 << 0); // A 5 4 3 2
+  for (var mask = 0; mask < 8192; mask++) {
+    var best = 0;
+    for (var h = 12; h >= 4; h--) {
+      var need = (1 << h) | (1 << (h - 1)) | (1 << (h - 2)) | (1 << (h - 3)) | (1 << (h - 4));
+      if ((mask & need) === need) { best = h; break; }
+    }
+    if (!best && (mask & wheel) === wheel) best = 3; // 5 高顺子（轮子），最高张=5
+    BITS_TO_STRAIGHT[mask] = best;
+  }
+})();
+
+/* ---------- 牌力评估：5~7 张取最强 5 张，返回可比较的整数 ---------- */
+var _rc = new Uint8Array(13);
+var _sc = new Uint8Array(4);
+var _sm = new Uint16Array(4);
+
+function packTopFromMask(mask, n) {
+  var out = 0, cnt = 0;
+  for (var r = 12; r >= 0 && cnt < n; r--) {
+    if (mask & (1 << r)) { out |= r << (16 - 4 * cnt); cnt++; }
+  }
+  return out;
+}
+
+function evaluateN(cards, n) {
+  var rc = _rc, sc = _sc, sm = _sm;
+  rc.fill(0); sc.fill(0); sm.fill(0);
+  var rankMask = 0;
+  for (var i = 0; i < n; i++) {
+    var c = cards[i], r = c >> 2, s = c & 3;
+    rc[r]++; sc[s]++; sm[s] |= 1 << r; rankMask |= 1 << r;
+  }
+  // ① 同花 / 同花顺（有 5 张同花色时，剩下最多 2 张凑不出葫芦或四条，所以直接返回必然正确）
+  for (var su = 0; su < 4; su++) {
+    if (sc[su] >= 5) {
+      var m = sm[su];
+      var sf = BITS_TO_STRAIGHT[m];
+      if (sf) return (8 << 20) | (sf << 16);
+      return (5 << 20) | packTopFromMask(m, 5);
+    }
+  }
+  // ② 四条
+  for (var q = 12; q >= 0; q--) {
+    if (rc[q] === 4) {
+      var kq = 0;
+      for (var k1 = 12; k1 >= 0; k1--) if (k1 !== q && rc[k1]) { kq = k1; break; }
+      return (7 << 20) | (q << 16) | (kq << 12);
+    }
+  }
+  // ③ 三条 / 对子统计
+  var trips = -1, pairHi = -1, pairLo = -1;
+  for (var r2 = 12; r2 >= 0; r2--) {
+    var cnt = rc[r2];
+    if (cnt === 3) {
+      if (trips < 0) trips = r2; else if (pairHi < 0) pairHi = r2;
+    } else if (cnt === 2) {
+      if (pairHi < 0) pairHi = r2; else if (pairLo < 0) pairLo = r2;
+    }
+  }
+  // ④ 葫芦
+  if (trips >= 0 && pairHi >= 0) return (6 << 20) | (trips << 16) | (pairHi << 12);
+  // ⑤ 顺子（顺子大于三条，所以要在三条之前判）
+  var st = BITS_TO_STRAIGHT[rankMask];
+  if (st) return (4 << 20) | (st << 16);
+  // ⑥ 三条
+  if (trips >= 0) {
+    var kk = 0, got = 0;
+    for (var r3 = 12; r3 >= 0 && got < 2; r3--) {
+      if (r3 !== trips && rc[r3]) { kk |= r3 << (got === 0 ? 12 : 8); got++; }
+    }
+    return (3 << 20) | (trips << 16) | kk;
+  }
+  // ⑦ 两对
+  if (pairHi >= 0 && pairLo >= 0) {
+    var kp = 0;
+    for (var r4 = 12; r4 >= 0; r4--) {
+      if (r4 !== pairHi && r4 !== pairLo && rc[r4]) { kp = r4; break; }
+    }
+    return (2 << 20) | (pairHi << 16) | (pairLo << 12) | (kp << 8);
+  }
+  // ⑧ 一对
+  if (pairHi >= 0) {
+    var ko = 0, g2 = 0;
+    for (var r5 = 12; r5 >= 0 && g2 < 3; r5--) {
+      if (r5 !== pairHi && rc[r5]) { ko |= r5 << (12 - 4 * g2); g2++; }
+    }
+    return (1 << 20) | (pairHi << 16) | ko;
+  }
+  // ⑨ 高牌
+  return packTopFromMask(rankMask, 5);
+}
+
+function evaluate7(cards) { return evaluateN(cards, 7); }
+function scoreCategory(score) { return score >>> 20; }
+
+function describeScore(score) {
+  var cat = score >>> 20;
+  var k = function (i) { return RANK_CHARS[(score >> (16 - 4 * i)) & 15]; };
+  switch (cat) {
+    case 8: return '同花顺（' + k(0) + ' 高）';
+    case 7: return '四条（' + k(0) + '）';
+    case 6: return '葫芦（' + k(0) + ' 带 ' + k(1) + '）';
+    case 5: return '同花（' + k(0) + ' 高）';
+    case 4: return '顺子（' + k(0) + ' 高）';
+    case 3: return '三条（' + k(0) + '）';
+    case 2: return '两对（' + k(0) + ' 和 ' + k(1) + '）';
+    case 1: return '一对（' + k(0) + '）';
+    default: return '高牌（' + k(0) + ' 高）';
+  }
+}
+
+/* ---------- 169 格 / 1326 组合 ---------- */
+function comboId(a, b) { return a < b ? (a << 6) | b : (b << 6) | a; }
+function comboCard1(id) { return id >> 6; }
+function comboCard2(id) { return id & 63; }
+
+function gridRowRank(i) { return 12 - i; }
+
+function cellInfo(idx) {
+  var i = Math.floor(idx / 13), j = idx % 13;
+  var rr = 12 - i, cr = 12 - j;
+  if (i === j) return { hi: rr, lo: cr, kind: 'p' };
+  if (i < j) return { hi: rr, lo: cr, kind: 's' };
+  return { hi: cr, lo: rr, kind: 'o' };
+}
+function cellOf(hi, lo, kind) {
+  if (kind === 'p') return (12 - hi) * 13 + (12 - hi);
+  if (kind === 's') return (12 - hi) * 13 + (12 - lo);
+  return (12 - lo) * 13 + (12 - hi);
+}
+function cellName(idx) {
+  var c = cellInfo(idx);
+  if (c.kind === 'p') return RANK_CHARS[c.hi] + RANK_CHARS[c.hi];
+  return RANK_CHARS[c.hi] + RANK_CHARS[c.lo] + c.kind;
+}
+function cellCombos(idx) {
+  var c = cellInfo(idx), out = [];
+  if (c.kind === 'p') {
+    for (var a = 0; a < 4; a++) for (var b = a + 1; b < 4; b++) out.push(comboId(makeCard(c.hi, a), makeCard(c.hi, b)));
+  } else if (c.kind === 's') {
+    for (var s = 0; s < 4; s++) out.push(comboId(makeCard(c.hi, s), makeCard(c.lo, s)));
+  } else {
+    for (var x = 0; x < 4; x++) for (var y = 0; y < 4; y++) if (x !== y) out.push(comboId(makeCard(c.hi, x), makeCard(c.lo, y)));
+  }
+  return out;
+}
+function comboToCell(id) {
+  var a = comboCard1(id), b = comboCard2(id);
+  var r1 = a >> 2, r2 = b >> 2;
+  if (r1 === r2) return (12 - r1) * 13 + (12 - r1);
+  var hi = Math.max(r1, r2), lo = Math.min(r1, r2);
+  var suited = ((a & 3) === (b & 3));
+  return suited ? (12 - hi) * 13 + (12 - lo) : (12 - lo) * 13 + (12 - hi);
+}
+
+/* ---------- 范围文字语法解析 ---------- */
+function parseCellToken(s) {
+  var m = /^([2-9TJQKA])([2-9TJQKA])([SO]?)$/.exec(s);
+  if (!m) return null;
+  var r1 = rankCharToIdx[m[1]], r2 = rankCharToIdx[m[2]], sfx = m[3];
+  if (r1 === r2) return sfx ? null : { hi: r1, lo: r1, kind: 'p' };
+  var hi = Math.max(r1, r2), lo = Math.min(r1, r2);
+  return { hi: hi, lo: lo, kind: sfx === 'S' ? 's' : sfx === 'O' ? 'o' : 'b' };
+}
+
+function parseRange(text) {
+  var cells = new Set();
+  var extras = [];
+  var errors = [];
+  var raw = String(text == null ? '' : text);
+  // 允许直接用花色图案输入，如 A♠K♥
+  raw = raw.replace(/\u2660/g, 's').replace(/\u2665/g, 'h').replace(/\u2666/g, 'd').replace(/\u2663/g, 'c');
+  var tokens = raw.replace(/[，,;；、]/g, ' ').split(/\s+/).filter(Boolean);
+  if (!tokens.length) return { cells: cells, extras: extras, combos: new Int32Array(0), errors: ['范围为空'] };
+
+  function addCellOf(hi, lo, kind) {
+    if (kind === 'b') { cells.add(cellOf(hi, lo, 's')); cells.add(cellOf(hi, lo, 'o')); }
+    else cells.add(cellOf(hi, lo, kind));
+  }
+
+  for (var t = 0; t < tokens.length; t++) {
+    var tk = tokens[t];
+    var up = tk.toUpperCase();
+    if (up === 'RANDOM' || up === 'RAND' || up === 'ANY' || tk === '*' || tk === '随机' || tk === '任意' || tk === '全部') {
+      for (var g = 0; g < 169; g++) cells.add(g);
+      continue;
+    }
+    // 具体两张牌：AsKd
+    var m4 = /^([2-9TJQKA])([SHDC])([2-9TJQKA])([SHDC])$/.exec(up);
+    if (m4) {
+      var c1 = makeCard(rankCharToIdx[m4[1]], 'SHDC'.indexOf(m4[2]));
+      var c2 = makeCard(rankCharToIdx[m4[3]], 'SHDC'.indexOf(m4[4]));
+      if (c1 === c2) { errors.push(tk + '：两张牌相同'); continue; }
+      var id0 = comboId(c1, c2);
+      extras.push(id0);   // 只加这一手具体牌，不点亮整个格子（格子里会显示成“部分组合”）
+      continue;
+    }
+    // 区间 a-b
+    if (up.indexOf('-') >= 0) {
+      var parts = up.split('-');
+      if (parts.length !== 2) { errors.push(tk + '：区间写错了'); continue; }
+      var A = parseCellToken(parts[0]), B = parseCellToken(parts[1]);
+      if (!A || !B) { errors.push(tk + '：区间两端认不出来'); continue; }
+      if (A.kind === 'p' && B.kind === 'p') {
+        var lo0 = Math.min(A.hi, B.hi), hi0 = Math.max(A.hi, B.hi);
+        for (var r = lo0; r <= hi0; r++) cells.add(cellOf(r, r, 'p'));
+      } else if (A.kind === B.kind && A.hi === B.hi) {
+        var l0 = Math.min(A.lo, B.lo), l1 = Math.max(A.lo, B.lo);
+        for (var r2 = l0; r2 <= l1; r2++) addCellOf(A.hi, r2, A.kind);
+      } else if (A.kind === B.kind && (A.hi - A.lo) === (B.hi - B.lo)) {
+        var step = A.hi > B.hi ? -1 : 1;
+        var h = A.hi, l = A.lo, guard = 0;
+        while (h > 0 && l >= 0 && guard++ < 20) {
+          addCellOf(h, l, A.kind);
+          if (h === B.hi) break;
+          h += step; l += step;
+        }
+      } else {
+        errors.push(tk + '：区间两端对不上');
+      }
+      continue;
+    }
+    // 单格 或 单格+
+    var plus = up.charAt(up.length - 1) === '+';
+    var base = plus ? up.slice(0, -1) : up;
+    var cell = parseCellToken(base);
+    if (!cell) { errors.push(tk + '：认不出来的写法'); continue; }
+    if (!plus) {
+      addCellOf(cell.hi, cell.lo, cell.kind);
+    } else if (cell.kind === 'p') {
+      for (var r3 = cell.hi; r3 <= 12; r3++) cells.add(cellOf(r3, r3, 'p'));
+    } else {
+      for (var l2 = cell.lo; l2 <= cell.hi - 1; l2++) addCellOf(cell.hi, l2, cell.kind);
+    }
+  }
+
+  var comboSet = new Set();
+  cells.forEach(function (idx) {
+    var list = cellCombos(idx);
+    for (var k = 0; k < list.length; k++) comboSet.add(list[k]);
+  });
+  for (var e = 0; e < extras.length; e++) comboSet.add(extras[e]);
+  var arr = Int32Array.from(comboSet);
+  arr.sort();
+  return { cells: cells, extras: extras, combos: arr, errors: errors };
+}
+
+function rangeToText(cells, extras) {
+  extras = extras || [];
+  var extraTxt = extras.map(function (id) { return cardDisplay(comboCard1(id)) + cardDisplay(comboCard2(id)); }).join(', ');
+  if (!cells || cells.size === 0) return extraTxt;
+  if (cells.size === 169 && !extras.length) return '随机';
+  var has = function (i) { return cells.has(i); };
+  var parts = [];
+  // 对子
+  var pr = [];
+  for (var r = 0; r <= 12; r++) if (has(cellOf(r, r, 'p'))) pr.push(r);
+  var i = 0;
+  while (i < pr.length) {
+    var j = i;
+    while (j + 1 < pr.length && pr[j + 1] === pr[j] + 1) j++;
+    var len = j - i + 1;
+    if (j === pr.length - 1 && j === 12 && len >= 2) parts.push(RANK_CHARS[pr[i]] + RANK_CHARS[pr[i]] + '+');
+    else if (len >= 3) parts.push(RANK_CHARS[pr[j]] + RANK_CHARS[pr[j]] + '-' + RANK_CHARS[pr[i]] + RANK_CHARS[pr[i]]);
+    else for (var a = i; a <= j; a++) parts.push(RANK_CHARS[pr[a]] + RANK_CHARS[pr[a]]);
+    i = j + 1;
+  }
+  // 同花 / 非同花（按首张分组，能连着到首张-1 的就用 + 压缩）
+  var kinds = ['s', 'o'];
+  for (var ki = 0; ki < 2; ki++) {
+    var kind = kinds[ki];
+    for (var hi = 12; hi >= 1; hi--) {
+      var los = [];
+      for (var lo = 0; lo < hi; lo++) if (has(cellOf(hi, lo, kind))) los.push(lo);
+      var p = 0;
+      while (p < los.length) {
+        var q = p;
+        while (q + 1 < los.length && los[q + 1] === los[q] + 1) q++;
+        var l = q - p + 1;
+        if (q === los.length - 1 && los[q] === hi - 1 && l >= 2) {
+          parts.push(RANK_CHARS[hi] + RANK_CHARS[los[p]] + kind + '+');
+        } else if (l >= 3) {
+          parts.push(RANK_CHARS[hi] + RANK_CHARS[los[q]] + kind + '-' + RANK_CHARS[hi] + RANK_CHARS[los[p]] + kind);
+        } else {
+          for (var b = p; b <= q; b++) parts.push(RANK_CHARS[hi] + RANK_CHARS[los[b]] + kind);
+        }
+        p = q + 1;
+      }
+    }
+  }
+  if (extraTxt) parts.push(extraTxt);
+  return parts.join(', ');
+}
+
+function rangeComboCount(cells) {
+  var n = 0;
+  cells.forEach(function (idx) { n += cellCombos(idx).length; });
+  return n;
+}
+
+/* ---------- 基础工具 ---------- */
+function binom(n, k) {
+  if (k < 0 || n < 0 || k > n) return 0;
+  if (k === 0 || k === n) return 1;
+  if (k > n - k) k = n - k;
+  var res = 1;
+  for (var i = 0; i < k; i++) res = res * (n - i) / (i + 1);
+  return Math.round(res);
+}
+function nowMs() {
+  return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+}
+
+/* ---------- 作战单位：一个「牌局任务」 ---------- */
+/* players: [{type:'hand', cards:[c1,c2]} | {type:'range', combos:Int32Array} | {type:'random'}] */
+function buildJob(players, board) {
+  var boardCards = [];
+  for (var i = 0; i < board.length; i++) if (board[i] !== null && board[i] !== undefined) boardCards.push(board[i]);
+  if (boardCards.length === 1 || boardCards.length === 2) return { ok: false, error: '公共牌至少要有 3 张（翻牌），或者干脆不填' };
+  var dead = new Set(boardCards);
+  var list = [];
+  var activeIdx = [];
+  for (var p = 0; p < players.length; p++) {
+    var pl = players[p];
+    if (pl.type === 'folded') continue;   // 已弃牌：不参与这一手
+    activeIdx.push(p);
+    if (pl.type === 'hand') {
+      var c1 = pl.cards[0], c2 = pl.cards[1];
+      if (c1 === null || c1 === undefined || c2 === null || c2 === undefined) return { ok: false, error: '玩家' + (p + 1) + '：手牌还没选完（要 2 张）' };
+      if (c1 === c2) return { ok: false, error: '玩家' + (p + 1) + '：两张牌一模一样' };
+      if (dead.has(c1) || dead.has(c2)) return { ok: false, error: '玩家' + (p + 1) + '：手牌和公共牌/其他玩家重复了（一副牌里同一张只能用一次）' };
+      dead.add(c1); dead.add(c2);
+      list.push({ kind: 'fixed', c1: c1, c2: c2, combos: Int32Array.of(comboId(c1, c2)) });
+    } else if (pl.type === 'range') {
+      var src = pl.combos || new Int32Array(0);
+      var keep = [];
+      for (var k = 0; k < src.length; k++) {
+        var id = src[k];
+        if (!dead.has(comboCard1(id)) && !dead.has(comboCard2(id))) keep.push(id);
+      }
+      if (!keep.length) return { ok: false, error: '玩家' + (p + 1) + '：范围里的牌全被占用了（和公共牌/固定手牌冲突），请加宽范围' };
+      list.push({ kind: 'range', combos: Int32Array.from(keep) });
+    } else {
+      list.push({ kind: 'random', combos: null });
+    }
+  }
+  if (list.length < 2) return { ok: false, error: '牌局里至少要剩 2 个人（其他人都弃牌了就没得算了）' };
+  return { ok: true, boardCards: boardCards, players: list, playerCount: list.length, activeIdx: activeIdx };
+}
+
+function estimateExactWork(job) {
+  var N = job.players.length;
+  var b = job.boardCards.length;
+  var need = 5 - b;
+  var prodCombos = 1;
+  for (var i = 0; i < N; i++) {
+    var p = job.players[i];
+    if (p.kind === 'range') prodCombos *= p.combos.length;
+    else if (p.kind === 'random') return { work: Infinity, prodCombos: Infinity, maxAssign: Infinity, feasible: false, reason: '有玩家是「随机」，随机手牌要枚举的组合太多' };
+    if (prodCombos > 1e12) return { work: Infinity, prodCombos: prodCombos, maxAssign: Infinity, feasible: false, reason: '范围组合太多' };
+  }
+  var freeMax = Math.max(0, 52 - b - 2 * N);
+  var boardCombos = binom(freeMax, need);
+  var work = prodCombos * boardCombos * N;
+  var tooManyHands = prodCombos > 200000;
+  return {
+    work: work,
+    prodCombos: prodCombos,
+    maxAssign: prodCombos,
+    feasible: !tooManyHands && work <= 50000000,
+    autoExact: !tooManyHands && work <= 4000000,
+    reason: tooManyHands ? '手牌组合太多（' + prodCombos + ' 种）' : '牌面枚举量太大'
+  };
+}
+
+/* ---------- 蒙特卡洛（分块执行，可显示进度/取消） ---------- */
+function createMCRunner(job, iterations, seed) {
+  var P = job.players, N = P.length, boardLen = job.boardCards.length;
+  var board = new Int32Array(5);
+  for (var i = 0; i < boardLen; i++) board[i] = job.boardCards[i];
+  var stamp = new Int32Array(52);
+  var gen = 0;
+  var rngState = (seed === undefined ? 88172645 : seed) | 0;
+  if (rngState === 0) rngState = 1;
+
+  var acc = {
+    equity: new Float64Array(N), sole: new Float64Array(N), tie: new Float64Array(N),
+    iters: 0, failed: 0, attempts: 0
+  };
+  var hand = new Int32Array(7);
+  var scores = new Int32Array(N);
+  var comboTmp = new Int32Array(N);
+
+  function rnd() {
+    var x = rngState;
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    rngState = x | 0;
+    return (x >>> 0) / 4294967296;
+  }
+
+  function runOne() {
+    gen++;
+    var s;
+    for (s = 0; s < boardLen; s++) stamp[board[s]] = gen;
+    for (var i = 0; i < N; i++) {
+      var p = P[i];
+      if (p.kind === 'fixed') { stamp[p.c1] = gen; stamp[p.c2] = gen; comboTmp[i] = p.combos[0]; }
+    }
+    var ok = true;
+    for (var j = 0; j < N; j++) {
+      var q = P[j];
+      if (q.kind === 'range') {
+        var combos = q.combos, m = combos.length, id = -1;
+        for (var tr = 0; tr < 24; tr++) {
+          var cand = combos[(rnd() * m) | 0];
+          if (stamp[cand >> 6] !== gen && stamp[cand & 63] !== gen) { id = cand; break; }
+        }
+        if (id < 0) {
+          for (var k = 0; k < m; k++) {
+            var c2 = combos[k];
+            if (stamp[c2 >> 6] !== gen && stamp[c2 & 63] !== gen) { id = c2; break; }
+          }
+        }
+        if (id < 0) { ok = false; break; }
+        stamp[id >> 6] = gen; stamp[id & 63] = gen;
+        comboTmp[j] = id;
+      } else if (q.kind === 'random') {
+        var a, b;
+        do { a = (rnd() * 52) | 0; } while (stamp[a] === gen);
+        stamp[a] = gen;
+        do { b = (rnd() * 52) | 0; } while (stamp[b] === gen);
+        stamp[b] = gen;
+        comboTmp[j] = comboId(a, b);
+      }
+    }
+    if (!ok) { acc.failed++; acc.attempts++; return; }
+    for (var bi = boardLen; bi < 5; bi++) {
+      var cc;
+      do { cc = (rnd() * 52) | 0; } while (stamp[cc] === gen);
+      stamp[cc] = gen; board[bi] = cc;
+    }
+    var best = -1, winners = 0;
+    for (var e = 0; e < N; e++) {
+      var cid = comboTmp[e];
+      hand[0] = cid >> 6; hand[1] = cid & 63;
+      hand[2] = board[0]; hand[3] = board[1]; hand[4] = board[2]; hand[5] = board[3]; hand[6] = board[4];
+      var sc = evaluateN(hand, 7);
+      scores[e] = sc;
+      if (sc > best) { best = sc; winners = 1; } else if (sc === best) winners++;
+    }
+    for (var w = 0; w < N; w++) {
+      if (scores[w] === best) {
+        acc.equity[w] += 1 / winners;
+        if (winners > 1) acc.tie[w] += 1; else acc.sole[w] += 1;
+      }
+    }
+    acc.iters++;
+    acc.attempts++;
+  }
+
+  function step(budgetMs) {
+    var t0 = nowMs();
+    while (acc.attempts < iterations) {
+      for (var i = 0; i < 256 && acc.attempts < iterations; i++) runOne();
+      if (nowMs() - t0 >= budgetMs) break;
+    }
+    return { done: acc.attempts >= iterations };
+  }
+
+  return {
+    kind: 'mc',
+    total: iterations,
+    acc: acc,
+    step: step,
+    progress: function () { return Math.min(1, acc.attempts / iterations); }
+  };
+}
+
+/* ---------- 精确枚举（分块执行；把每一种可能都算一遍） ---------- */
+function createExactRunner(job) {
+  var N = job.players.length;
+  var baseLen = job.boardCards.length;
+  var depth = 5 - baseLen;
+  var fullBoard = new Int32Array(5);
+  for (var i = 0; i < baseLen; i++) fullBoard[i] = job.boardCards[i];
+  var used0 = new Uint8Array(52);
+  for (var b = 0; b < baseLen; b++) used0[job.boardCards[b]] = 1;
+  var comboTmp = new Int32Array(N);
+  for (var p = 0; p < N; p++) {
+    var pl = job.players[p];
+    if (pl.kind === 'fixed') { used0[pl.c1] = 1; used0[pl.c2] = 1; comboTmp[p] = pl.combos[0]; }
+  }
+
+  // 生成「各范围玩家的手牌分配」表
+  var rangeList = [];
+  for (var r = 0; r < N; r++) if (job.players[r].kind === 'range') rangeList.push({ pi: r, combos: job.players[r].combos });
+  var assignments = [];
+  var chosen = new Int32Array(rangeList.length);
+  var used = used0.slice();
+  var aborted = false;
+  (function rec(k) {
+    if (aborted) return;
+    if (k === rangeList.length) { assignments.push(Int32Array.from(chosen)); return; }
+    var list = rangeList[k].combos;
+    for (var t = 0; t < list.length; t++) {
+      var id = list[t], a = id >> 6, c = id & 63;
+      if (used[a] || used[c]) continue;
+      used[a] = 1; used[c] = 1;
+      chosen[k] = id;
+      rec(k + 1);
+      used[a] = 0; used[c] = 0;
+      if (aborted) return;
+      if (assignments.length > 200000) { aborted = true; return; }
+    }
+  })(0);
+
+  // 统计总牌面数（用于进度）
+  var totalRounds = 0;
+  var freeLens = new Int32Array(assignments.length);
+  for (var ai = 0; ai < assignments.length; ai++) {
+    var u = used0.slice();
+    var asg = assignments[ai];
+    for (var q = 0; q < rangeList.length; q++) {
+      var cid = asg[q];
+      u[cid >> 6] = 1; u[cid & 63] = 1;
+      comboTmp[rangeList[q].pi] = cid;
+    }
+    var freeN = 0;
+    for (var c2 = 0; c2 < 52; c2++) if (!u[c2]) freeN++;
+    freeLens[ai] = freeN;
+    totalRounds += binom(freeN, depth);
+  }
+
+  var acc = {
+    equity: new Float64Array(N), sole: new Float64Array(N), tie: new Float64Array(N),
+    iters: 0, failed: 0, attempts: 0, rounds: 0
+  };
+  var hand = new Int32Array(7);
+  var scores = new Int32Array(N);
+  var cur = -1, free = null, odo = null, odoDone = true;
+
+  function loadAssignment(ai) {
+    var u = used0.slice();
+    var asg = assignments[ai];
+    for (var q = 0; q < rangeList.length; q++) {
+      var cid = asg[q];
+      u[cid >> 6] = 1; u[cid & 63] = 1;
+      comboTmp[rangeList[q].pi] = cid;
+    }
+    free = [];
+    for (var c = 0; c < 52; c++) if (!u[c]) free.push(c);
+    if (depth === 0) { odo = null; odoDone = false; }
+    else {
+      odo = new Int32Array(depth);
+      for (var d = 0; d < depth; d++) odo[d] = d;
+      odoDone = free.length < depth;
+    }
+  }
+
+  function advance() {
+    if (depth === 0) return false;
+    for (var i = depth - 1; i >= 0; i--) {
+      if (odo[i] < free.length - (depth - i)) {
+        odo[i]++;
+        for (var j = i + 1; j < depth; j++) odo[j] = odo[j - 1] + 1;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function evalRound() {
+    for (var d = 0; d < depth; d++) fullBoard[baseLen + d] = free[odo[d]];
+    var best = -1, winners = 0;
+    for (var e = 0; e < N; e++) {
+      var cid = comboTmp[e];
+      hand[0] = cid >> 6; hand[1] = cid & 63;
+      hand[2] = fullBoard[0]; hand[3] = fullBoard[1]; hand[4] = fullBoard[2];
+      hand[5] = fullBoard[3]; hand[6] = fullBoard[4];
+      var sc = evaluateN(hand, 7);
+      scores[e] = sc;
+      if (sc > best) { best = sc; winners = 1; } else if (sc === best) winners++;
+    }
+    for (var w = 0; w < N; w++) {
+      if (scores[w] === best) {
+        acc.equity[w] += 1 / winners;
+        if (winners > 1) acc.tie[w] += 1; else acc.sole[w] += 1;
+      }
+    }
+    acc.iters++;
+    acc.attempts++;
+    acc.rounds++;
+  }
+
+  function step(budgetMs) {
+    var t0 = nowMs();
+    var since = 0;
+    while (true) {
+      if (cur < 0) { cur = 0; loadAssignment(0); }
+      if (cur >= assignments.length) { cur = -2; return { done: true }; }
+      if (!odoDone) {
+        while (true) {
+          evalRound();
+          var more = advance();
+          if (!more) { odoDone = true; break; }
+          if ((++since & 63) === 0 && nowMs() - t0 >= budgetMs) return { done: false };
+        }
+      }
+      cur++;
+      if (cur >= assignments.length) { cur = -2; return { done: true }; }
+      loadAssignment(cur);
+      if (nowMs() - t0 >= budgetMs) return { done: false };
+    }
+  }
+
+  return {
+    kind: 'exact',
+    total: totalRounds,
+    acc: acc,
+    step: step,
+    assignments: assignments.length,
+    aborted: aborted,
+    progress: function () { return totalRounds ? Math.min(1, acc.rounds / totalRounds) : 1; }
+  };
+}
+
+/* ---------- 同步便捷接口（Node 测试用） ---------- */
+function runMonteCarloSync(players, board, iterations, seed) {
+  var job = buildJob(players, board);
+  if (!job.ok) return job;
+  var runner = createMCRunner(job, iterations, seed);
+  while (!runner.step(1e9).done) { /* 一次跑完 */ }
+  return toResult(runner, job);
+}
+
+function runExactSync(players, board) {
+  var job = buildJob(players, board);
+  if (!job.ok) return job;
+  var runner = createExactRunner(job);
+  while (!runner.step(1e9).done) { /* 一次跑完 */ }
+  return toResult(runner, job);
+}
+
+function toResult(runner, job) {
+  var a = runner.acc, n = a.iters || 1, N = job.players.length;
+  var equity = [], sole = [], tie = [], lose = [];
+  for (var i = 0; i < N; i++) {
+    var eq = a.equity[i] / n * 100, so = a.sole[i] / n * 100, ti = a.tie[i] / n * 100;
+    equity.push(eq); sole.push(so); tie.push(ti); lose.push(100 - so - ti);
+  }
+  return { ok: true, kind: runner.kind, iters: a.iters, failed: a.failed, equity: equity, sole: sole, tie: tie, lose: lose };
+}
+
+/* ---------- 听牌 Outs 速查 ---------- */
+function outsToHit(outs, toCome, unseen) {
+  if (toCome <= 0) return 0;
+  return (1 - binom(unseen - outs, toCome) / binom(unseen, toCome)) * 100;
+}
+
+function computeOuts(handCards, boardCards) {
+  if (handCards.length !== 2) return { ok: false, error: '需要 2 张手牌' };
+  if (boardCards.length < 3) return { ok: false, error: '公共牌至少 3 张（翻牌）' };
+  if (boardCards.length > 4) return { ok: false, error: '已经到河牌了，没有下一张牌可算' };
+  var all = handCards.concat(boardCards);
+  var used = new Set(all);
+  var curScore = 0;
+  if (all.length === 5) curScore = evaluateN(all, 5);
+  else {
+    var best = -1;
+    for (var skip = 0; skip < 6; skip++) {
+      var five = [];
+      for (var i = 0; i < 6; i++) if (i !== skip) five.push(all[i]);
+      var sc = evaluateN(five, 5);
+      if (sc > best) best = sc;
+    }
+    curScore = best;
+  }
+  var curCat = curScore >>> 20;
+  var unseen = 52 - all.length;
+  var toCome = 5 - boardCards.length;
+
+  // 同花听牌
+  var suitCount = [0, 0, 0, 0];
+  for (var s = 0; s < all.length; s++) suitCount[all[s] & 3]++;
+  var flushOuts = 0, flushSuit = -1;
+  for (var su = 0; su < 4; su++) if (suitCount[su] === 4) { flushSuit = su; flushOuts = 9; }
+
+  // 逐张枚举：算顺子听牌 + 各类提升
+  var curRankMask = 0;
+  for (var cm = 0; cm < all.length; cm++) curRankMask |= 1 << (all[cm] >> 2);
+  var curHasStraight = BITS_TO_STRAIGHT[curRankMask] !== 0;
+  var straightCards = [], sfCards = [], improveMap = {};
+  var improveCards = [];
+  for (var c = 0; c < 52; c++) {
+    if (used.has(c)) continue;
+    // 顺子听牌：看点数组合有没有接上（哪怕同时成了同花也算这张能接顺）
+    if (!curHasStraight && BITS_TO_STRAIGHT[curRankMask | (1 << (c >> 2))] !== 0) straightCards.push(c);
+    var nx = all.concat([c]);
+    var best2 = -1;
+    if (nx.length === 6) {
+      for (var sk = 0; sk < 6; sk++) {
+        var f2 = [];
+        for (var j = 0; j < 6; j++) if (j !== sk) f2.push(nx[j]);
+        var s2 = evaluateN(f2, 5);
+        if (s2 > best2) best2 = s2;
+      }
+    } else {
+      best2 = evaluateN(nx, 7);
+    }
+    var cat2 = best2 >>> 20;
+    if (cat2 > curCat) {
+      improveCards.push(c);
+      var nm = CATEGORY_NAMES[cat2];
+      if (!improveMap[nm]) improveMap[nm] = [];
+      improveMap[nm].push(c);
+    }
+    if (cat2 === 8) sfCards.push(c);
+  }
+
+  var draws = [];
+  if (flushOuts > 0) {
+    var fCards = [];
+    for (var fc = 0; fc < 52; fc++) if ((fc & 3) === flushSuit && !used.has(fc)) fCards.push(fc);
+    draws.push({ key: 'flush', name: '同花听牌', outs: fCards.length, cards: fCards, toHit: outsToHit(fCards.length, toCome, unseen) });
+  }
+  if (straightCards.length > 0) {
+    var sName = straightCards.length >= 8 ? '两头顺听牌' : (straightCards.length === 4 ? '卡顺听牌' : '顺子听牌');
+    draws.push({ key: 'straight', name: sName, outs: straightCards.length, cards: straightCards, toHit: outsToHit(straightCards.length, toCome, unseen) });
+  }
+  if (sfCards.length > 0) {
+    draws.push({ key: 'sf', name: '同花顺听牌', outs: sfCards.length, cards: sfCards, toHit: outsToHit(sfCards.length, toCome, unseen) });
+  }
+  // 组合听牌（并集）
+  var unionSet = new Set();
+  for (var d = 0; d < draws.length; d++) for (var dc = 0; dc < draws[d].cards.length; dc++) unionSet.add(draws[d].cards[dc]);
+  var unionOuts = unionSet.size;
+
+  var improvements = [];
+  for (var key in improveMap) improvements.push({ name: key, cards: improveMap[key] });
+  improvements.sort(function (x, y) { return y.cards.length - x.cards.length; });
+
+  return {
+    ok: true,
+    curCat: curCat,
+    curName: describeScore(curScore),
+    unseen: unseen,
+    toCome: toCome,
+    draws: draws,
+    unionOuts: unionOuts,
+    unionHit: outsToHit(unionOuts, toCome, unseen),
+    improvements: improvements,
+    improveTotal: improveCards.length,
+    improveHit: outsToHit(improveCards.length, toCome, unseen)
+  };
+}
+
+/* ---------- 对手风格预设（6 人桌常见打法，非 GTO 精确解） ---------- */
+var OPPONENT_PRESETS = [
+  { key: 'tight', label: '紧', tip: '紧手：打得很保守，只用好牌加注', text: 'TT+, AQs+, AKo' },
+  { key: 'normal', label: '常规', tip: '常规开牌：普通玩家的加注范围', text: '66+, A9s+, A5s-A2s, KTs+, QTs+, JTs, T9s, 98s, ATo+, KJo+, QJo' },
+  { key: 'loose', label: '松', tip: '松手：什么牌都敢加注', text: '22+, A2s+, K8s+, Q8s+, J8s+, T8s+, 97s+, 87s, 76s, 65s, A9o+, KTo+, QTo+, JTo' },
+  { key: 'station', label: '跟注站', tip: '跟注站：什么都跟、很少弃牌', text: '22+, A2s+, K2s+, Q2s+, J2s+, T4s+, 95s+, 85s+, 74s+, 63s+, 53s+, 43s, A2o+, K2o+, Q2o+, J4o+, T6o+, 96o+, 86o+, 75o+, 65o, 54o' },
+  { key: 'random', label: '随机', tip: '完全不知道他是什么牌：任意两张（1326 种组合）', text: '' }
+];
+
+/* ---------- 一行话解析：把「我 BTN A♠K♠ | 公共牌 A♥7♣2♦ | CO 加注」拆成结构化数据 ---------- */
+var SITU_POS_ALIAS = [
+  { key: 'UTG', words: ['UTG', '枪口位', '枪口', '第一个说话'] },
+  { key: 'MP', words: ['MP', '中位', '中间位', 'HJ'] },
+  { key: 'CO', words: ['CO', '关煞位', '关煞', '劫位'] },
+  { key: 'BTN', words: ['BTN', 'BU', '按钮位', '按钮', '庄位'] },
+  { key: 'SB', words: ['SB', '小盲注', '小盲'] },
+  { key: 'BB', words: ['BB', '大盲注', '大盲'] }
+];
+var SITU_ACT_ALIAS = [
+  { key: 'threebet', words: ['3BET', '3-BET', '再加注', '反加'] },
+  { key: 'allin', words: ['全下', '全押', 'ALLIN', 'ALL-IN', 'SHOVE', '推了'] },
+  { key: 'pot', words: ['底池', '满池', 'POT'] },
+  { key: 'call', words: ['跟注', '平跟', 'CALL', 'LIMP', '溜入'] },
+  { key: 'raise', words: ['加注', 'RAISE', '开牌', 'OPEN'] },
+  { key: 'fold', words: ['弃牌', 'FOLD'] },
+  { key: 'random', words: ['随机', '任意', 'RANDOM', 'RAND'] }
+];
+function situFindPos(text) {
+  var up = String(text).toUpperCase();
+  for (var i = 0; i < SITU_POS_ALIAS.length; i++) {
+    var w = SITU_POS_ALIAS[i].words;
+    for (var j = 0; j < w.length; j++) if (up.indexOf(String(w[j]).toUpperCase()) >= 0) return SITU_POS_ALIAS[i].key;
+  }
+  return null;
+}
+function situFindAct(text) {
+  var up = String(text).toUpperCase();
+  for (var i = 0; i < SITU_ACT_ALIAS.length; i++) {
+    var w = SITU_ACT_ALIAS[i].words;
+    for (var j = 0; j < w.length; j++) if (up.indexOf(String(w[j]).toUpperCase()) >= 0) return SITU_ACT_ALIAS[i].key;
+  }
+  return null;
+}
+function situExtractCards(seg) {
+  var t = String(seg).replace(/\u2660/g, 'S').replace(/\u2665/g, 'H').replace(/\u2666/g, 'D').replace(/\u2663/g, 'C').toUpperCase();
+  var m = t.match(/[2-9TJQKA][SHDC]/g);
+  return m ? m.join('') : '';
+}
+/* 返回 { myPos, myCards, board, actions:[{pos,action}], errors:[] } */
+function parseSituation(text) {
+  var out = { myPos: null, myCards: '', board: '', actions: [], errors: [] };
+  var segs = String(text == null ? '' : text).split(/[|｜\n;；]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  if (!segs.length) { out.errors.push('没有内容'); return out; }
+  segs.forEach(function (seg) {
+    var up = seg.toUpperCase();
+    var cards = situExtractCards(seg);
+    if (cards.length > 10) { out.errors.push('牌太多了：' + seg); return; }
+    if (/公共牌|牌面|BOARD|翻牌|转牌|河牌/.test(up)) {
+      if (!cards) { out.errors.push('公共牌没写牌：' + seg); return; }
+      out.board = cards;
+      return;
+    }
+    var pos = situFindPos(seg);
+    var act = situFindAct(seg);
+    if (/我|自己|本人|HERO/.test(up)) {
+      if (pos) out.myPos = pos;
+      if (cards) out.myCards = cards;
+      return;
+    }
+    if (pos && act) { out.actions.push({ pos: pos, action: act }); return; }
+    if (pos && cards) { out.myPos = pos; out.myCards = cards; return; }
+    if (pos) { out.myPos = pos; return; }
+    if (cards && !act) {
+      // 按张数判断：2 张 = 我的手牌；3~5 张 = 公共牌
+      if (cards.length === 4) { out.myCards = cards; return; }
+      if (cards.length >= 6 && cards.length <= 10) { out.board = cards; return; }
+      out.errors.push('牌的张数不对（应该 2 / 3 / 4 / 5 张）：' + seg);
+      return;
+    }
+    if (act) { out.errors.push('这个动作没说清是谁：' + seg); return; }
+    out.errors.push('认不出这段：' + seg);
+  });
+  return out;
+}
+
+/* ---------- 牌面对比：这个范围在翻牌面上「中了什么」 ---------- */
+function madeClassVsBoard(hole, board) {
+  var all = hole.concat(board);
+  var cat = evaluateN(all, all.length) >>> 20;
+  if (cat >= 2) return 'strong';            // 两对及以上
+  if (cat === 1) {
+    var br = {}, top = -1;
+    for (var i = 0; i < board.length; i++) { var r = board[i] >> 2; br[r] = 1; if (r > top) top = r; }
+    var h1 = hole[0] >> 2, h2 = hole[1] >> 2;
+    if (h1 === h2) return h1 > top ? 'toppair' : 'mid';    // 口袋对：超对算顶对级
+    if ((br[h1] && h1 === top) || (br[h2] && h2 === top)) return 'toppair';
+    return 'mid';                                          // 中/底对、小口袋对
+  }
+  return 'air';
+}
+function hasFlushDraw(hole, board) {
+  var cnt = [0, 0, 0, 0];
+  for (var i = 0; i < hole.length; i++) cnt[hole[i] & 3]++;
+  for (var j = 0; j < board.length; j++) cnt[board[j] & 3]++;
+  for (var s = 0; s < 4; s++) if (cnt[s] === 4) return true;
+  return false;
+}
+function straightDrawCards(hole, board) {
+  var mask = 0, used = {};
+  for (var i = 0; i < hole.length; i++) { mask |= 1 << (hole[i] >> 2); used[hole[i]] = 1; }
+  for (var j = 0; j < board.length; j++) { mask |= 1 << (board[j] >> 2); used[board[j]] = 1; }
+  if (BITS_TO_STRAIGHT[mask]) return [];
+  var out = [];
+  for (var c = 0; c < 52; c++) {
+    if (used[c]) continue;
+    if (BITS_TO_STRAIGHT[mask | (1 << (c >> 2))]) out.push(c);
+  }
+  return out;
+}
+/* combos 传 Int32Array/数组；传 null 表示「任意两张牌」。
+   dead 是已经不可能在对手手里的牌（公共牌 + 其他人的手牌）。 */
+function rangeHitStats(combos, board, dead) {
+  var used = {};
+  for (var i = 0; i < board.length; i++) used[board[i]] = 1;
+  if (dead) for (var d = 0; d < dead.length; d++) used[dead[d]] = 1;
+  var res = { total: 0, strong: 0, toppair: 0, mid: 0, draw: 0, air: 0, madeWithDraw: 0, flushDraw: 0, straightDraw: 0 };
+  var canDraw = board.length >= 3 && board.length <= 4;
+  function add(c1, c2) {
+    var hole = [c1, c2];
+    var made = madeClassVsBoard(hole, board);
+    res.total++;
+    var fDraw = canDraw ? hasFlushDraw(hole, board) : false;
+    var sOuts = canDraw ? straightDrawCards(hole, board).length : 0;
+    var hasDraw = fDraw || sOuts >= 4;
+    if (made === 'strong') res.strong++;
+    else if (made === 'toppair') res.toppair++;
+    else if (made === 'mid') res.mid++;
+    else res[hasDraw ? 'draw' : 'air']++;
+    if (made !== 'air' && hasDraw) res.madeWithDraw++;
+    if (canDraw && made !== 'strong') {
+      if (fDraw) res.flushDraw++;
+      if (sOuts >= 4) res.straightDraw++;
+    }
+  }
+  if (combos) {
+    for (var k = 0; k < combos.length; k++) {
+      var a = comboCard1(combos[k]), b = comboCard2(combos[k]);
+      if (used[a] || used[b]) continue;
+      add(a, b);
+    }
+  } else {
+    for (var x = 0; x < 52; x++) {
+      if (used[x]) continue;
+      for (var y = x + 1; y < 52; y++) { if (used[y]) continue; add(x, y); }
+    }
+  }
+  return res;
+}
+
+/* ---------- 座位上的「下注情况」按钮：真实动作（左）---------- */
+var SEAT_ACTIONS = [
+  { key: 'call', label: '跟注', tip: '他跟注进来了（没加注）：中等强度的牌', text: '22+, A2s+, KTs+, QTs+, JTs, T9s, 98s, ATo+, KJo+, QJo' },
+  { key: 'raise', label: '加注', tip: '他加注了：按本座位的位置开牌范围估', text: '' },
+  { key: 'pot', label: '底池', tip: '他下/加注了一个底池（打得很凶）：强牌为主', text: 'TT+, AQs+, AKo' },
+  { key: 'threebet', label: '3bet', tip: '他反加注（3bet）：比加注强得多，含少量诈唬', text: 'QQ+, AQs+, AKo' },
+  { key: 'allin', label: '全下', tip: '他把筹码全推了：通常代表极强的牌', text: 'QQ+, AKs, AKo' },
+  { key: 'fold', label: '弃牌', tip: '他没玩这手牌：不参与计算', fold: true }
+];
+/* 兼容旧名字 */
+var ACTION_PRESETS = SEAT_ACTIONS.filter(function (a) { return a.key === 'threebet' || a.key === 'allin'; });
+
+/* ---------- 翻前位置参考范围（6 人桌 100BB 常规打法，非 GTO 精确解） ---------- */
+var POSITION_RANGES = [
+  { key: 'UTG', zh: '枪口位', label: 'UTG 枪口位', kind: 'raise', text: '77+, ATs+, A5s-A2s, KTs+, QTs+, JTs, ATo+, KQo' },
+  { key: 'MP', zh: '中位', label: 'MP 中位', kind: 'raise', text: '55+, A9s+, A5s-A2s, KTs+, Q9s+, J9s+, T9s, 98s, ATo+, KJo+, QJo' },
+  { key: 'CO', zh: '关煞位', label: 'CO 关煞位', kind: 'raise', text: '33+, A2s+, K8s+, Q8s+, J8s+, T8s+, 97s+, 87s, 76s, 65s, A9o+, KTo+, QTo+, JTo' },
+  { key: 'BTN', zh: '按钮位', label: 'BTN 按钮位', kind: 'raise', text: '22+, A2s+, K2s+, Q4s+, J6s+, T6s+, 96s+, 85s+, 74s+, 63s+, 53s+, 43s, A2o+, K8o+, Q9o+, J9o+, T9o, 98o' },
+  { key: 'SB', zh: '小盲', label: 'SB 小盲', kind: 'raise', text: '22+, A2s+, K2s+, Q5s+, J6s+, T6s+, 96s+, 86s+, 75s+, 64s+, 53s+, A7o+, K9o+, Q9o+, J9o+, T9o' },
+  { key: 'BB', zh: '大盲', label: 'BB 大盲（防守）', kind: 'call', text: '22+, A2s+, K2s+, Q2s+, J4s+, T6s+, 96s+, 86s+, 75s+, 64s+, 54s, A2o+, K5o+, Q7o+, J8o+, T8o+, 98o' }
+];
+var POSITION_ORDER = ['UTG', 'MP', 'CO', 'BTN', 'SB', 'BB'];
+var POSITION_TIPS = {
+  UTG: '枪口位：翻牌前第一个说话的人，位置最差，能玩的牌最少',
+  MP: '中位：在枪口位后面说话',
+  CO: '关煞位：按钮位的前一个，位置不错',
+  BTN: '按钮位：最后一个说话，位置最好，能玩最多牌',
+  SB: '小盲：翻牌前要被迫下盲注，翻牌后第一个说话',
+  BB: '大盲：翻牌前最后说话，但翻牌后第一个说话'
+};
+
+/* ---------- 导出 ---------- */
+var API = {
+  RANK_CHARS: RANK_CHARS, SUIT_CHARS: SUIT_CHARS, SUIT_SYMBOLS: SUIT_SYMBOLS, CATEGORY_NAMES: CATEGORY_NAMES,
+  makeCard: makeCard, cardRank: cardRank, cardSuit: cardSuit, cardName: cardName, cardDisplay: cardDisplay, isRedCard: isRedCard,
+  BITS_TO_STRAIGHT: BITS_TO_STRAIGHT,
+  evaluateN: evaluateN, evaluate7: evaluate7, scoreCategory: scoreCategory, describeScore: describeScore,
+  cellInfo: cellInfo, cellOf: cellOf, cellName: cellName, cellCombos: cellCombos, comboToCell: comboToCell,
+  comboId: comboId, comboCard1: comboCard1, comboCard2: comboCard2,
+  parseRange: parseRange, rangeToText: rangeToText, rangeComboCount: rangeComboCount,
+  binom: binom,
+  buildJob: buildJob, estimateExactWork: estimateExactWork,
+  createMCRunner: createMCRunner, createExactRunner: createExactRunner,
+  runMonteCarloSync: runMonteCarloSync, runExactSync: runExactSync,
+  outsToHit: outsToHit, computeOuts: computeOuts,
+  madeClassVsBoard: madeClassVsBoard, hasFlushDraw: hasFlushDraw, straightDrawCards: straightDrawCards, rangeHitStats: rangeHitStats,
+  POSITION_RANGES: POSITION_RANGES, OPPONENT_PRESETS: OPPONENT_PRESETS, ACTION_PRESETS: ACTION_PRESETS,
+  SEAT_ACTIONS: SEAT_ACTIONS,
+  parseSituation: parseSituation,
+  POSITION_ORDER: POSITION_ORDER, POSITION_TIPS: POSITION_TIPS
+};
+if (typeof module !== 'undefined' && module.exports) module.exports = API;
+if (typeof globalThis !== 'undefined') globalThis.PokerCore = API;
+})();
+</script>
+
+<script id="ui">
+/* ==========================================================================
+   UI（牌桌 + 座位 + 选中座位编辑面板）
+   ========================================================================== */
+(function () {
+'use strict';
+var C = globalThis.PokerCore;
+var $ = function (id) { return document.getElementById(id); };
+
+var PLAYER_COLORS = ['#4da3ff', '#ff8a5c', '#4fe08c', '#c48cff', '#ffd15c', '#5cd8ff', '#ff7bb0', '#9ce05c', '#b0b8c8'];
+var COMBO_COUNT = {};   // 各预设范围的组合数（启动时算一次，用于提示）
+function computeComboCounts() {
+  C.POSITION_RANGES.forEach(function (p) { COMBO_COUNT[p.key] = C.parseRange(p.text).combos.length; });
+  C.OPPONENT_PRESETS.forEach(function (p) { COMBO_COUNT[p.key] = p.text ? C.parseRange(p.text).combos.length : 1326; });
+  C.SEAT_ACTIONS.forEach(function (p) { if (p.text) COMBO_COUNT[p.key] = C.parseRange(p.text).combos.length; });
+}
+
+var state = {
+  playerCount: 6,
+  players: [],
+  activeIdx: [],
+  myPos: 'BB',
+  selectedSeat: 0,
+  focus: { kind: 'hand', pi: 0, ci: 0 },
+  running: false,
+  runner: null,
+  cancelFlag: false,
+  pendingAuto: false,
+  lastResult: null,
+  log: [],
+  settingsOpen: false,   // ⚙ 设置抽屉
+  moreOpen: false,       // 座位面板里的「更多选项」（全局记忆，切座位不重置）
+  manualOpen: false,     // 手动输入 / 研究范围
+  detailOpen: false      // 结果明细
+};
+
+function newPlayer(i) {
+  var p = { type: 'hand', cards: [null, null], rangeText: '', range: null, tag: '' };
+  if (i === 1) p.type = 'range';
+  else if (i > 1) p.type = 'folded';
+  return p;
+}
+
+/* ---------------- 小工具 ---------------- */
+var toastTimer = null;
+function toast(msg, isErr) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.className = 'toast'; }, 3200);
+}
+/* 折叠开关：只加/去 class，DOM 一直留着（测试和 Esc/焦点逻辑都依赖） */
+function syncFolds() {
+  $('settingsBox').classList.toggle('collapsed', !state.settingsOpen);
+  $('manualBox').classList.toggle('collapsed', !state.manualOpen);
+  $('manualArrow').textContent = state.manualOpen ? '▾' : '▸';
+  // 有非默认设置时在 ⚙ 上显示小红点（尤其是自动计算被关掉）
+  var nonDefault = !$('autoRun').checked || $('modeSel').value !== 'auto' || $('speedSel').value !== 'normal'
+    || +$('playerCountSel').value !== 6 || $('myPosSel').value !== 'BB';
+  $('settingsDot').style.display = nonDefault ? 'inline-block' : 'none';
+}
+function el(tag, cls, text) {
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+/* ---------------- 座位位置 ---------------- */
+function seatPosKey(i) {
+  var m = C.POSITION_ORDER.indexOf(state.myPos);
+  if (m < 0) m = 5;
+  return C.POSITION_ORDER[(m + i) % 6];
+}
+/* 指定某个座位的位置 → 反推「我坐哪」，其他座位按顺序自动跟着转 */
+function setSeatPos(i, key) {
+  var orderIdx = C.POSITION_ORDER.indexOf(key);
+  if (orderIdx < 0) return;
+  var before = [];
+  for (var k = 0; k < state.playerCount; k++) before.push(seatPosKey(k));
+  state.myPos = C.POSITION_ORDER[(orderIdx - (i % 6) + 6) % 6];
+  $('myPosSel').value = state.myPos;
+  // 按位置填的范围，跟着新位置一起换
+  var changed = 0;
+  for (var j = 0; j < state.playerCount; j++) {
+    var q = state.players[j];
+    var nb = before[j], na = seatPosKey(j);
+    if (nb === na) continue;
+    if (q.type === 'range' && q.tag && q.tag === posInfoByKey(nb).zh) {
+      var np = posInfoByKey(na);
+      q.range = C.parseRange(np.text);
+      q.rangeText = np.text;
+      q.tag = np.zh;
+      changed++;
+    }
+  }
+  renderSeats(); renderSeatEditor(); renderBoard(); updateGrid(); syncPosTargets(); markStale();
+  toast('玩家' + (i + 1) + ' = ' + posInfoByKey(key).zh + '，其他座位按顺序跟着排好了'
+    + (changed ? '（' + changed + ' 个按位置填的范围也一起换了）' : ''));
+}
+function findAction(key) {
+  for (var i = 0; i < C.SEAT_ACTIONS.length; i++) if (C.SEAT_ACTIONS[i].key === key) return C.SEAT_ACTIONS[i];
+  return null;
+}
+function posInfoByKey(key) {
+  for (var i = 0; i < C.POSITION_RANGES.length; i++) if (C.POSITION_RANGES[i].key === key) return C.POSITION_RANGES[i];
+  return C.POSITION_RANGES[5];
+}
+
+/* ---------------- 输入解析 ---------------- */
+function parseCardList(text) {
+  var s = String(text || '').replace(/[\s,，]/g, '').toUpperCase();
+  s = s.replace(/\u2660/g, 'S').replace(/\u2665/g, 'H').replace(/\u2666/g, 'D').replace(/\u2663/g, 'C');
+  if (!s) return { cards: [] };
+  if (s === 'RANDOM' || s === 'RAND') return { random: true, cards: [] };
+  if (s.length % 2 !== 0) return { error: '牌写得不完整（每张牌 = 点数+花色，如 A♠）' };
+  var out = [];
+  for (var i = 0; i < s.length; i += 2) {
+    var r = C.RANK_CHARS.indexOf(s[i]), su = 'SHDC'.indexOf(s[i + 1]);
+    if (r < 0 || su < 0) return { error: '认不出的牌：' + s.substr(i, 2) };
+    out.push(C.makeCard(r, su));
+  }
+  var seen = {};
+  for (var k = 0; k < out.length; k++) {
+    if (seen[out[k]]) return { error: '有重复的牌：' + C.cardDisplay(out[k]) };
+    seen[out[k]] = 1;
+  }
+  return { cards: out };
+}
+function looksPartialCard(s) {
+  return /^[2-9TJQKA][SHDC]?$/i.test(s.trim()) || /^[2-9TJQKA][SHDC][2-9TJQKA]$/i.test(s.trim());
+}
+
+/* 把一段文字应用到某个座位：具体牌 / 范围 / 随机 / 弃牌 */
+function applyPlayerText(i, text, silent, fromTyping) {
+  var raw = String(text || '').trim();
+  var p = state.players[i];
+  if (!raw) { if (!silent) toast('输入为空：可以写 A♠K♠（具体牌）、AKs（牌型范围）、随机、弃牌'); return false; }
+  var done = function () {
+    renderSeats(); renderSeatEditor(fromTyping); updateCardPanel(); updateGrid(); syncTopBar(); markStale();
+  };
+  if (raw === '随机' || raw === '任意' || /^(rand|random|any|\*)$/i.test(raw)) {
+    p.type = 'random'; p.cards = [null, null]; p.range = null; p.rangeText = ''; p.tag = '';
+    done(); return true;
+  }
+  if (raw === '弃牌' || raw === '已弃牌' || /^(fold|folded)$/i.test(raw)) {
+    p.type = 'folded'; p.cards = [null, null]; p.range = null; p.rangeText = ''; p.tag = '弃牌';
+    done(); return true;
+  }
+  var cards = parseCardList(raw);
+  if (cards.error === undefined && cards.cards && cards.cards.length >= 1 && cards.cards.length <= 2) {
+    p.type = 'hand'; p.range = null; p.rangeText = ''; p.tag = '';
+    p.cards = [cards.cards[0], cards.cards.length > 1 ? cards.cards[1] : null];
+    done(); return true;
+  }
+  var rng = C.parseRange(raw);
+  if (rng.combos.length > 0) {
+    p.type = 'range';
+    p.cards = [null, null];
+    p.range = rng;
+    p.rangeText = C.rangeToText(rng.cells, rng.extras);
+    p.tag = '';
+    done();
+    if (rng.errors.length && !silent) toast('部分内容没认出来：' + rng.errors.join('；'), true);
+    return true;
+  }
+  if (cards.error) { if (!silent) toast(cards.error, true); return false; }
+  if (rng.errors.length && rng.errors[0] !== '范围为空') { if (!silent) toast('认不出来：' + rng.errors.join('；'), true); return false; }
+  if (!silent) toast('认不出来的写法：' + raw, true);
+  return false;
+}
+function applyBoardText(text, silent) {
+  var raw = String(text || '').trim();
+  if (!raw || raw === '清空' || raw === '清除') {
+    state.board = [null, null, null, null, null];
+    renderBoard(); updateCardPanel(); markStale(); return true;
+  }
+  var r = parseCardList(raw);
+  if (r.error) { if (!silent) toast(r.error, true); return false; }
+  if (r.cards.length > 5) { if (!silent) toast('公共牌最多 5 张', true); return false; }
+  if (r.cards.length > 0 && r.cards.length < 3) { if (!silent) toast('公共牌要么不填，要么至少 3 张（翻牌）', true); return false; }
+  state.board = [null, null, null, null, null];
+  for (var i = 0; i < r.cards.length; i++) state.board[i] = r.cards[i];
+  renderBoard(); updateCardPanel(); markStale();
+  return true;
+}
+
+/* ---------------- 预设 ---------------- */
+function applyPreset(i, preset) {
+  var p = state.players[i];
+  if (!preset.text) {
+    applyPlayerText(i, '随机', true);
+    state.players[i].tag = '随机';
+    renderSeats(); renderSeatEditor();
+    toast('玩家' + (i + 1) + '：已设为「完全随机」（任意两张牌）');
+    return;
+  }
+  p.type = 'range';
+  p.range = C.parseRange(preset.text);
+  p.rangeText = preset.text;
+  p.tag = preset.label;
+  renderSeats(); renderSeatEditor(); updateCardPanel(); updateGrid(); syncTopBar(); markStale();
+  toast('玩家' + (i + 1) + ' 已填好：' + preset.label + '（' + p.range.combos.length + ' 种组合）');
+}
+function foldSeat(i) {
+  var p = state.players[i];
+  p.type = 'folded'; p.cards = [null, null]; p.range = null; p.rangeText = ''; p.tag = '弃牌';
+  renderSeats(); renderSeatEditor(); updateCardPanel(); updateGrid(); syncTopBar(); markStale();
+  toast('玩家' + (i + 1) + '：已弃牌（这手不算他了）');
+}
+/* 下一手：按钮位置往前走一格（大盲→小盲→按钮位…），清掉手牌和公共牌，保留对手范围 */
+function nextHand() {
+  var idx = C.POSITION_ORDER.indexOf(state.myPos);
+  if (idx < 0) idx = 5;
+  state.myPos = C.POSITION_ORDER[(idx + 5) % 6];
+  $('myPosSel').value = state.myPos;
+  var p = state.players[0];
+  p.type = 'hand'; p.cards = [null, null]; p.range = null; p.rangeText = ''; p.tag = '';
+  state.board = [null, null, null, null, null];
+  state.selectedSeat = 0;
+  state.focus = { kind: 'hand', pi: 0, ci: 0 };
+  renderSeats(); renderSeatEditor(); renderBoard(); updateCardPanel(); updateGrid();
+  syncPosTargets(); syncTopBar(); markStale();
+  toast('下一手：你现在是「' + posInfoByKey(state.myPos).zh + '」。手牌和公共牌已清空，对手范围保留');
+  var hi = $('myHandInput');
+  if (hi) hi.focus();
+}
+/* 一行话 → 填好整桌 */
+function cardsPretty(s) {
+  var out = '';
+  for (var i = 0; i + 1 < s.length; i += 2) {
+    var r = C.RANK_CHARS.indexOf(s[i]), su = 'SHDC'.indexOf(s[i + 1]);
+    if (r >= 0 && su >= 0) out += C.cardDisplay(C.makeCard(r, su));
+  }
+  return out;
+}
+function seatByPosKey(key) {
+  for (var i = 0; i < state.playerCount; i++) if (seatPosKey(i) === key) return i;
+  return -1;
+}
+function applySeatActionKey(i, actionKey) {
+  if (actionKey === 'random') { applyPreset(i, { label: '随机', text: '' }); return; }
+  var act = findAction(actionKey);
+  if (!act) return;
+  if (act.fold) { foldSeat(i); return; }
+  if (act.key === 'raise') {
+    var p = posInfoByKey(seatPosKey(i));
+    applyPreset(i, { label: p.zh, text: p.text });
+    return;
+  }
+  applyPreset(i, { label: act.label, text: act.text });
+}
+function applySituation(text) {
+  var s = C.parseSituation(text);
+  if (!s.myPos && !s.myCards && !s.board && !s.actions.length) {
+    toast('这行话没读懂。格式参考：我 BTN A♠K♠ | 公共牌 A♥7♣2♦ | CO 加注'
+      + (s.errors.length ? '（' + s.errors.join('；') + '）' : ''), true);
+    return false;
+  }
+  if (s.myPos) { state.myPos = s.myPos; $('myPosSel').value = s.myPos; }
+  if (s.actions.length) {   // 这行话描述的是完整局面：没提到的座位算「还没进池」
+    for (var k = 1; k < state.playerCount; k++) {
+      var q = state.players[k];
+      q.type = 'folded'; q.cards = [null, null]; q.range = null; q.rangeText = ''; q.tag = '';
+    }
+  }
+  if (s.myCards) applyPlayerText(0, s.myCards, true);
+  if (s.board) applyBoardText(s.board, true);
+  var applied = [];
+  s.actions.forEach(function (a) {
+    var seat = seatByPosKey(a.pos);
+    var label = posInfoByKey(a.pos).zh;
+    if (seat <= 0) { applied.push(label + '(没这个座位)'); return; }
+    applySeatActionKey(seat, a.action);
+    applied.push(label + ' ' + (a.action === 'random' ? '随机' : findAction(a.action).label));
+  });
+  renderSeats(); renderSeatEditor(); renderBoard(); updateCardPanel(); updateGrid();
+  syncPosTargets(); syncTopBar(true); markStale();
+  var msg = [];
+  if (s.myPos) msg.push('我坐' + posInfoByKey(s.myPos).zh);
+  if (s.myCards) msg.push('手牌 ' + cardsPretty(s.myCards));
+  if (s.board) msg.push('公共牌 ' + cardsPretty(s.board));
+  if (applied.length) msg.push(applied.join('、'));
+  toast('已填好：' + msg.join(' · ') + (s.errors.length ? '（' + s.errors.join('；') + '）' : ''));
+  return true;
+}
+function selectSeat(i) {
+  state.selectedSeat = i;
+  var p = state.players[i];
+  if (p.type === 'hand') {
+    if (p.cards[0] === null) state.focus = { kind: 'hand', pi: i, ci: 0 };
+    else if (p.cards[1] === null) state.focus = { kind: 'hand', pi: i, ci: 1 };
+    else state.focus = { kind: 'hand', pi: i, ci: 0 };
+  }
+  renderSeats(); renderSeatEditor(); updateCardPanel(); updateGrid(); syncPosTargets();
+}
+
+/* ---------------- 牌桌 ---------------- */
+function seatStateText(i) {
+  var p = state.players[i];
+  if (p.type === 'folded') return (p.tag === '弃牌' ? '弃牌' : '还没进池') + ' · 不参与';
+  if (p.type === 'random') return '随机（任意两张）';
+  if (p.type === 'range') {
+    var seatZh = posInfoByKey(seatPosKey(i)).zh;
+    var n = (p.range ? p.range.combos.length : 0) + ' 种组合';
+    return (p.tag && p.tag !== seatZh ? p.tag + ' · ' : '') + n;   // 位置已经单独显示了，不重复
+  }
+  return p.cards[0] !== null || p.cards[1] !== null ? '手牌' : '还没选牌';
+}
+function seatEquity(i) {
+  var r = state.lastResult;
+  if (!r) return null;
+  var k = r.map.indexOf(i);
+  return k >= 0 ? r.equity[k] : null;
+}
+function buildSeat(i) {
+  var p = state.players[i];
+  var pos = posInfoByKey(seatPosKey(i));
+  var s = el('div', 'seat' + (i === 0 ? ' me' : '') + (p.type === 'folded' ? ' folded' : '')
+    + (state.selectedSeat === i ? ' selected' : ''));
+
+  // 上框：胜率
+  var eqBox = el('div', 'seatEqBox');
+  var eq = seatEquity(i);
+  eqBox.appendChild(el('div', 'seatEq', eq === null ? '—' : eq.toFixed(1) + '%'));
+  s.appendChild(eqBox);
+
+  var row = el('div', 'seatRow');
+
+  // 左框：下注情况（真实动作，含弃牌）
+  var left = el('div', 'actGrid');
+  C.SEAT_ACTIONS.forEach(function (act) {
+    if (act.key === 'fold' && i === 0) return;          // 我方不可能弃牌
+    var b = el('button', 'miniBtn' + (act.fold ? ' fold' : ' pot'), act.label);
+    if (act.key === 'raise') {
+      b.title = '他加注了 → 按本座位位置「' + pos.zh + '」填参考范围（' + COMBO_COUNT[pos.key] + ' 种组合）';
+      b.addEventListener('click', function (ev) { ev.stopPropagation(); applyPreset(i, { label: pos.zh, text: pos.text }); });
+    } else if (act.fold) {
+      b.title = act.tip;
+      b.addEventListener('click', function (ev) { ev.stopPropagation(); foldSeat(i); });
+    } else {
+      var n = COMBO_COUNT[act.key];
+      b.title = act.tip + '（' + n + ' 种组合，约 ' + Math.round(n / 1326 * 100) + '% 的牌）';
+      b.addEventListener('click', function (ev) { ev.stopPropagation(); applyPreset(i, { label: act.label, text: act.text }); });
+    }
+    if (p.tag === act.label) b.classList.add('sel');
+    left.appendChild(b);
+  });
+  row.appendChild(left);
+
+  // 中框（角色框）：玩家号码 + 状态（+ 亮牌时的两张牌）
+  var mid = el('div', 'seatBox');
+  mid.appendChild(el('div', 'seatName', '玩家' + (i + 1) + (i === 0 ? '（我）' : '')));
+  var st = el('div', 'seatState', seatStateText(i));
+  if (p.type === 'range' && p.rangeText) st.title = p.rangeText;
+  mid.appendChild(st);
+  if (p.type === 'hand' && (p.cards[0] !== null || p.cards[1] !== null)) {
+    var cr = el('div', 'seatCards');
+    [0, 1].forEach(function (k) {
+      var c = p.cards[k];
+      if (c === null) { cr.appendChild(el('span', 'miniCard', '?')); return; }
+      cr.appendChild(el('span', 'miniCard' + (C.isRedCard(c) ? ' red' : ''), C.cardDisplay(c)));
+    });
+    mid.appendChild(cr);
+  }
+  row.appendChild(mid);
+
+  // 右框：位置（点一下可以切换）
+  var posBox = el('div', 'posBox');
+  var pb = el('span', 'posBadge', pos.zh);
+  pb.title = '点这里改这个座位的位置';
+  posBox.appendChild(pb);
+  var menu = el('div', 'posMenu');
+  var mkItem = function (label, key) {
+    var b = el('button', 'posMenuItem' + (pos.key === key ? ' sel' : ''), label);
+    b.addEventListener('click', function (ev) { ev.stopPropagation(); setSeatPos(i, key); });
+    return b;
+  };
+  menu.appendChild(el('div', 'posMenuHint', '点一个位置 → 其他座位跟着排'));
+  C.POSITION_RANGES.forEach(function (pp) { menu.appendChild(mkItem(pp.zh + '（' + pp.key + '）', pp.key)); });
+  posBox.appendChild(menu);
+  posBox.addEventListener('click', function (ev) {
+    ev.stopPropagation();
+    var open = menu.classList.contains('open');
+    Array.prototype.slice.call(document.querySelectorAll('.posMenu.open')).forEach(function (m) { m.classList.remove('open'); });
+    if (!open) menu.classList.add('open');
+  });
+  row.appendChild(posBox);
+
+  s.appendChild(row);
+  (function (ii) { s.addEventListener('click', function () { selectSeat(ii); }); })(i);
+  return s;
+}
+function renderSeats() {
+  var wrap = $('tableWrap');
+  Array.prototype.slice.call(wrap.querySelectorAll('.seat')).forEach(function (n) { n.remove(); });
+  var n = state.playerCount;
+  var dense = n >= 7;
+  wrap.classList.toggle('dense', dense);
+  var rad = dense ? 40 : 34;
+  for (var i = 0; i < n; i++) {
+    var ang = (90 + i * 360 / n) * Math.PI / 180;
+    var s = buildSeat(i);
+    s.style.left = (50 + Math.cos(ang) * rad).toFixed(2) + '%';
+    s.style.top = (50 + Math.sin(ang) * rad).toFixed(2) + '%';
+    var left = 50 + Math.cos(ang) * rad;
+    if (left < 22) s.style.transform = 'translate(-20%, -50%)';
+    else if (left > 78) s.style.transform = 'translate(-80%, -50%)';
+    wrap.appendChild(s);
+  }
+  $('feltTitle').textContent = state.playerCount + ' 人桌 · 我坐' + posInfoByKey(state.myPos).zh;
+}
+
+/* ---------------- 选中座位编辑面板 ---------------- */
+function openManual() {
+  state.manualOpen = true;
+  syncFolds();
+  var g = $('rangeGrid');
+  if (g && g.scrollIntoView) g.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function editorRow(label) {
+  var r = el('div', 'seRow');
+  r.appendChild(el('span', 'plabel', label));
+  return r;
+}
+function bigBtn(text, cls, title, fn) {
+  var b = el('button', 'pbtn big ' + (cls || ''), text);
+  b.title = title || '';
+  b.addEventListener('click', fn);
+  return b;
+}
+function renderSeatEditor(fromTyping) {
+  var box = $('seatEditor');
+  var i = state.selectedSeat;
+  var p = state.players[i];
+  var pos = posInfoByKey(seatPosKey(i));
+  var inp = box.querySelector('input[data-kind="player"]');
+  if (fromTyping && inp && box.dataset.seat === String(i)) {
+    // 正在打字：只更新不重建，避免光标丢失
+    var ci = box.querySelector('.comboInfo');
+    if (ci) ci.innerHTML = comboInfoHtml(i);
+    var eqEl = box.querySelector('.seEq');
+    var eq = seatEquity(i);
+    if (eqEl) eqEl.textContent = eq === null ? '—' : eq.toFixed(1) + '%';
+    return;
+  }
+  box.dataset.seat = String(i);
+  box.innerHTML = '';
+
+  var head = el('div', 'seHead');
+  head.appendChild(el('div', 'seTitle', '玩家' + (i + 1) + (i === 0 ? '（我）' : '') + ' · ' + pos.zh));
+  var eq0 = seatEquity(i);
+  head.appendChild(el('div', 'seEq', eq0 === null ? '—' : eq0.toFixed(1) + '%'));
+  box.appendChild(head);
+  box.appendChild(el('div', 'hint', '动作按钮就在牌桌上他的座位卡片里（左边是下注情况）。这里可以：输他的具体手牌、按他的打法微调范围、手动指定位置。'));
+
+  var rStyle = editorRow('他的打法');
+  C.OPPONENT_PRESETS.forEach(function (ps) {
+    var b = el('button', 'pbtn' + (p.tag === ps.label ? ' sel' : ''), ps.label);
+    b.title = ps.tip + (ps.text ? '（' + COMBO_COUNT[ps.key] + ' 种组合，约 ' + Math.round(COMBO_COUNT[ps.key] / 1326 * 100) + '% 的牌）' : '');
+    b.addEventListener('click', function () { applyPreset(i, ps); });
+    rStyle.appendChild(b);
+  });
+  box.appendChild(rStyle);
+
+  // 「更多选项」：默认收起；展开状态全局记忆（换个座位不会自己合上）
+  var moreBox = box;   // 面板本身就是「更多」区域了，不再折叠
+
+  // 3bet/全下/底池 这些动作按钮已经搬到座位卡片上了
+
+  // 手牌 / 范围
+  var r3 = el('div', 'seRow');
+  r3.appendChild(el('span', 'plabel', '他的手牌'));
+  var cards = el('div', 'seCards');
+  [0, 1].forEach(function (ci) {
+    var s = el('div', 'slot');
+    var focused = state.focus.kind === 'hand' && state.focus.pi === i && state.focus.ci === ci;
+    if (focused) s.classList.add('focus');
+    var c = p.type === 'hand' ? p.cards[ci] : null;
+    if (c === null) s.appendChild(el('span', 'hint', '?'));
+    else {
+      if (C.isRedCard(c)) s.classList.add('red');
+      s.classList.add('filled');
+      s.appendChild(el('span', null, C.RANK_CHARS[C.cardRank(c)]));
+      s.appendChild(el('span', 'suit', C.SUIT_SYMBOLS[C.cardSuit(c)]));
+    }
+    s.addEventListener('click', function () { state.focus = { kind: 'hand', pi: i, ci: ci }; renderSeatEditor(); updateCardPanel(); });
+    cards.appendChild(s);
+  });
+  r3.appendChild(cards);
+  box.appendChild(r3);
+
+  var inp2 = document.createElement('input');
+  inp2.className = 'seInput';
+  inp2.spellcheck = false;
+  inp2.dataset.kind = 'player';
+  inp2.dataset.pi = String(i);
+  inp2.placeholder = '具体牌写 A♠K♠ · 一类牌写 AKs / JJ+ · 或写 随机 / 弃牌';
+  inp2.value = p.type === 'hand' ? p.cards.map(function (c) { return c === null ? '' : C.cardDisplay(c); }).join('')
+    : p.type === 'range' ? p.rangeText : p.type === 'folded' ? '弃牌' : '随机';
+  inp2.title = '具体两张牌写 A♠K♠；一类牌写 AKs / JJ+；或写 随机 / 弃牌';
+  inp2.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { applyPlayerText(i, inp2.value); inp2.blur(); } });
+  inp2.addEventListener('change', function () { applyPlayerText(i, inp2.value); });
+  var deb = null;
+  inp2.addEventListener('input', function () {
+    clearTimeout(deb);
+    deb = setTimeout(function () {
+      var v = inp2.value.trim();
+      if (v.length < 3 || looksPartialCard(v)) return;
+      applyPlayerText(i, v, true, true);
+      var ci = box.querySelector('.comboInfo');
+      if (ci) ci.innerHTML = comboInfoHtml(i);
+    }, 380);
+  });
+  box.appendChild(inp2);
+  var ci = el('div', 'comboInfo');
+  ci.innerHTML = comboInfoHtml(i);
+  box.appendChild(ci);
+  if (p.type === 'range') {
+    var openBtn = el('button', 'pbtn', '改范围（展开范围图）');
+    openBtn.title = '展开下面的「手动输入 / 研究范围」，点格子就能改他的范围';
+    openBtn.addEventListener('click', openManual);
+    box.appendChild(openBtn);
+  }
+
+  // 范围命中率搬到 ③ 号区域（胜率旁边）
+  renderHitArea();
+
+  moreBox.appendChild(el('div', 'hint', i === 0
+    ? '你的位置在「⚙ 设置」里选（点「下一手」会自动往前转）。想比较「两个范围对打」时，点上面的打法按钮。'
+    : '位置在座位右边的框里点一下就能改。'));
+}
+/* 某个座位（范围/随机）在当前牌面上的命中分布；不适用时返回 null */
+function hitStatsFor(i) {
+  var p = state.players[i];
+  if (p.type === 'folded' || p.type === 'hand') return null;
+  var board = state.board.filter(function (c) { return c !== null; });
+  if (board.length < 3) return null;
+  var others = [];
+  for (var k = 0; k < state.playerCount; k++) {
+    if (k === i) continue;
+    var q = state.players[k];
+    if (q.type === 'hand') q.cards.forEach(function (c) { if (c !== null) others.push(c); });
+  }
+  var combos = p.type === 'random' ? null : (p.range ? p.range.combos : null);
+  return C.rangeHitStats(combos, board, others);
+}
+function comboInfoHtml(i) {
+  var p = state.players[i];
+  if (p.type === 'range') {
+    var n = p.range ? p.range.combos.length : 0;
+    var extra = (p.range && p.range.extras.length) ? '（含 ' + p.range.extras.length + ' 张指定具体牌）' : '';
+    return '范围组合数：<b>' + n + '</b> 种具体牌' + extra + '<br>想改范围：直接打字，或点下面的「改范围」按钮去点格子';
+  }
+  var used = collectUsed();
+  var conflict = p.type === 'hand' && p.cards.some(function (c) { return c !== null && used[c]; });
+  if (p.type === 'hand') return '手牌：' + (p.cards[0] !== null || p.cards[1] !== null ? '已选 ' + p.cards.filter(function (c) { return c !== null; }).length + ' 张' : '还没选');
+  if (p.type === 'folded') return '已弃牌，不参与这一手';
+  return '随机：1326 种组合全部可能';
+}
+
+/* ---------------- 公共牌 / 牌面面板 ---------------- */
+function slotEl(kind, pi, ci, small) {
+  var s = el('div', 'slot' + (small ? ' small' : ''));
+  var focused = kind === 'board'
+    ? (state.focus.kind === 'board' && state.focus.ci === ci)
+    : (state.focus.kind === 'hand' && state.focus.pi === pi && state.focus.ci === ci);
+  if (focused) s.classList.add('focus');
+  var c = kind === 'board' ? state.board[ci] : (state.players[pi].type === 'hand' ? state.players[pi].cards[ci] : null);
+  if (c === null || c === undefined) s.appendChild(el('span', 'hint', '?'));
+  else {
+    if (C.isRedCard(c)) s.classList.add('red');
+    s.classList.add('filled');
+    s.appendChild(el('span', null, C.RANK_CHARS[C.cardRank(c)]));
+    s.appendChild(el('span', 'suit', C.SUIT_SYMBOLS[C.cardSuit(c)]));
+  }
+  s.addEventListener('click', function () {
+    state.focus = kind === 'board' ? { kind: 'board', pi: 0, ci: ci } : { kind: 'hand', pi: pi, ci: ci };
+    renderBoard(); renderMyHandSlots(); renderSeatEditor(); updateCardPanel();
+  });
+  return s;
+}
+function renderBoard() {
+  [['boardSlots', true], ['boardSlots2', false]].forEach(function (pair) {
+    var box = $(pair[0]);
+    if (!box) return;
+    box.innerHTML = '';
+    for (var i = 0; i < 5; i++) box.appendChild(slotEl('board', 0, i, pair[1]));
+  });
+  renderMyHandSlots();
+}
+/* ① 区里的「我的手牌」两个牌位 */
+function renderMyHandSlots() {
+  var box = $('myHandSlots');
+  if (!box) return;
+  box.innerHTML = '';
+  var p = state.players[0];
+  for (var ci = 0; ci < 2; ci++) box.appendChild(slotEl('hand', 0, ci, false));
+  if (p.type !== 'hand') box.appendChild(el('span', 'hint', '（我方现在是' + (p.type === 'range' ? '范围' : p.type === 'folded' ? '弃牌' : '随机') + '，点牌位会切回具体手牌）'));
+}
+function renderCardPanel() {
+  var box = $('cardPanel');
+  box.innerHTML = '';
+  for (var s = 0; s < 4; s++) {
+    for (var r = 12; r >= 0; r--) {
+      var card = C.makeCard(r, s);
+      var b = el('button', 'cardBtn' + (C.isRedCard(card) ? ' red' : ''), C.RANK_CHARS[r] + C.SUIT_SYMBOLS[s]);
+      b.dataset.card = card;
+      b.addEventListener('click', function () { onCardClick(+this.dataset.card); });
+      box.appendChild(b);
+    }
+  }
+}
+function collectUsed() {
+  var used = {};
+  for (var i = 0; i < state.playerCount; i++) {
+    var p = state.players[i];
+    if (p.type !== 'hand') continue;
+    p.cards.forEach(function (c, ci) {
+      if (c === null) return;
+      if (state.focus.kind === 'hand' && state.focus.pi === i && state.focus.ci === ci) return;
+      used[c] = 1;
+    });
+  }
+  state.board.forEach(function (c, i) {
+    if (c !== null && !(state.focus.kind === 'board' && state.focus.ci === i)) used[c] = 1;
+  });
+  return used;
+}
+function updateCardPanel() {
+  var used = collectUsed();
+  var btns = $('cardPanel').children;
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('used', !!used[+btns[i].dataset.card]);
+  var fh = $('focusHint');
+  if (state.focus.kind === 'hand') {
+    var p = state.players[state.focus.pi];
+    fh.textContent = '正在填：玩家' + (state.focus.pi + 1) + ' 的第 ' + (state.focus.ci + 1) + ' 张' + (p && p.type !== 'hand' ? '（先把上面切到「手牌」）' : '');
+  } else if (state.focus.kind === 'board') fh.textContent = '正在填：公共牌第 ' + (state.focus.ci + 1) + ' 张';
+}
+function onCardClick(card) {
+  if (collectUsed()[card]) { toast('这张 ' + C.cardDisplay(card) + ' 已经被别的牌位占用了', true); return; }
+  var f = state.focus;
+  if (f.kind === 'hand') {
+    var p = state.players[f.pi];
+    if (p.type !== 'hand') { p.type = 'hand'; p.range = null; p.rangeText = ''; p.tag = ''; }
+    if (p.cards[f.ci] === card) p.cards[f.ci] = null;
+    else p.cards[f.ci] = card;
+    if (p.cards[0] !== null && p.cards[1] !== null) {
+      // 两张都选好了 → 自动跳到第一个空的公共牌位（不会自己跳回手牌，除非你又点了手牌框）
+      var bi = -1;
+      for (var bk = 0; bk < 5; bk++) if (state.board[bk] === null) { bi = bk; break; }
+      if (bi >= 0) state.focus = { kind: 'board', pi: 0, ci: bi };
+      else f.ci = 0;
+    } else {
+      f.ci = p.cards[0] === null ? 0 : 1;
+    }
+  } else if (f.kind === 'board') {
+    if (state.board[f.ci] === card) state.board[f.ci] = null;
+    else state.board[f.ci] = card;
+    var next = -1;
+    for (var nk = 1; nk <= 5; nk++) { var ix = (f.ci + nk) % 5; if (state.board[ix] === null) { next = ix; break; } }
+    f.ci = next >= 0 ? next : (f.ci + 1) % 5;
+  }
+  renderSeats(); renderSeatEditor(); renderBoard(); updateCardPanel(); syncTopBar(true); markStale();
+}
+
+/* ---------------- 范围图 ---------------- */
+function buildRangeGrid() {
+  var box = $('rangeGrid');
+  box.innerHTML = '';
+  for (var idx = 0; idx < 169; idx++) {
+    var cell = el('div', 'gc');
+    if (C.cellInfo(idx).kind === 'p') cell.classList.add('pair');
+    cell.textContent = C.cellName(idx);
+    cell.dataset.idx = idx;
+    cell.title = C.cellName(idx) + '：' + C.cellCombos(idx).length + ' 种组合';
+    cell.addEventListener('click', function () { onCellClick(+this.dataset.idx); });
+    box.appendChild(cell);
+  }
+}
+function onCellClick(idx) {
+  var i = state.selectedSeat;
+  var p = state.players[i];
+  if (p.type !== 'range') {
+    p.type = 'range';
+    if (!p.range) p.range = C.parseRange('');
+    toast('已把玩家' + (i + 1) + ' 切换成「范围」，点格子就是在给他选牌型');
+  }
+  var cells = p.range.cells;
+  if (cells.has(idx)) cells.delete(idx); else cells.add(idx);
+  p.range.extras = p.range.extras.filter(function (id) { return C.comboToCell(id) !== idx; });
+  var combos = new Set();
+  cells.forEach(function (k) { C.cellCombos(k).forEach(function (id) { combos.add(id); }); });
+  p.range.extras.forEach(function (id) { combos.add(id); });
+  var arr = Int32Array.from(combos); arr.sort();
+  p.range.combos = arr;
+  p.rangeText = C.rangeToText(cells, p.range.extras);
+  p.tag = '';
+  renderSeats(); renderSeatEditor(); updateCardPanel(); updateGrid(); syncTopBar(); markStale();
+}
+function updateGrid() {
+  var box = $('rangeGrid');
+  var p = state.players[state.selectedSeat];
+  var cells = (p && p.type === 'range' && p.range) ? p.range.cells : null;
+  var partial = {};
+  if (p && p.type === 'range' && p.range) p.range.extras.forEach(function (id) { partial[C.comboToCell(id)] = 1; });
+  for (var i = 0; i < box.children.length; i++) {
+    var c = box.children[i];
+    var on = cells ? cells.has(i) : false;
+    c.classList.toggle('on', on && !partial[i]);
+    c.classList.toggle('part', !!partial[i]);
+  }
+  $('gridTargetName').textContent = p ? ('玩家' + (state.selectedSeat + 1) + (p.type === 'range' ? '' : '（点格子会自动切成范围）')) : '';
+  $('gridInfo').textContent = cells && p.range ? ('已选 ' + cells.size + ' 个牌型 / ' + p.range.combos.length + ' 种具体牌') : '';
+}
+
+/* ---------------- 顶栏 ---------------- */
+function syncTopBar(force) {
+  var hi = $('myHandInput');
+  if (hi && (force || document.activeElement !== hi)) {
+    var p = state.players[0];
+    hi.value = p.type === 'hand' ? p.cards.map(function (c) { return c === null ? '' : C.cardDisplay(c); }).join('') : '';
+    hi.placeholder = p.type === 'hand' ? 'A♠K♠' : '（我方现在是' + (p.type === 'range' ? '范围' : p.type === 'folded' ? '弃牌' : '随机') + '）';
+  }
+  var bi = $('boardInput');
+  if (bi && (force || document.activeElement !== bi)) {
+    bi.value = state.board.filter(function (c) { return c !== null; }).map(C.cardDisplay).join('');
+  }
+}
+function bindTextInput(inp, handler) {
+  inp.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); handler(inp); inp.blur(); } });
+  inp.addEventListener('change', function () { handler(inp); });
+  var deb = null;
+  inp.addEventListener('input', function () {
+    clearTimeout(deb);
+    deb = setTimeout(function () {
+      var v = inp.value.trim();
+      if (v.length < 3 || looksPartialCard(v)) return;
+      handler(inp, true);
+    }, 380);
+  });
+}
+
+/* ---------------- 计算 ---------------- */
+function markStale() {
+  var auto = $('autoRun') && $('autoRun').checked;
+  if (!state.running) {
+    $('statusLine').textContent = auto ? '参数已变化，正在自动重算…' : '参数已变化，点「开始计算」刷新结果。';
+    // 座位上的旧胜率、决策条先变淡，表示「这是改动前的数字」
+    Array.prototype.slice.call(document.querySelectorAll('.seatEq')).forEach(function (n) {
+      if (n.textContent !== '—') n.classList.add('stale');
+    });
+    $('decideText').classList.add('stale');
+  }
+  maybeAutoRun();
+  updateOutsTab();
+}
+var autoRunTimer = null;
+function maybeAutoRun() {
+  var cb = $('autoRun');
+  if (!cb || !cb.checked) return;
+  clearTimeout(autoRunTimer);
+  autoRunTimer = setTimeout(function () {
+    if (!$('autoRun').checked) return;
+    if (state.running) { state.pendingAuto = true; return; }
+    run(true);
+  }, 380);
+}
+function collectSpecs() {
+  var specs = [];
+  for (var i = 0; i < state.playerCount; i++) {
+    var p = state.players[i];
+    if (p.type === 'folded') specs.push({ type: 'folded' });
+    else if (p.type === 'hand') specs.push({ type: 'hand', cards: [p.cards[0], p.cards[1]] });
+    else if (p.type === 'range') specs.push({ type: 'range', combos: p.range ? p.range.combos : new Int32Array(0) });
+    else specs.push({ type: 'random' });
+  }
+  return specs;
+}
+function chooseIters(N, speed) {
+  var base = N <= 2 ? 100000 : N <= 5 ? 50000 : 20000;
+  if (speed === 'fast') return Math.max(10000, Math.round(base / 4));
+  if (speed === 'fine') return Math.min(1000000, base * 5);
+  return base;
+}
+function run(silent) {
+  if (state.running) { if (silent) state.pendingAuto = true; return; }
+  var job = C.buildJob(collectSpecs(), state.board);
+  if (!job.ok) {
+    var msg = job.error;
+    if (/至少/.test(msg)) msg = '牌局里至少要剩 2 个人（现在只剩你）：点对手的座位 → 「进池」（他加注/跟注了），或者「弃牌」';
+    if (silent) $('statusLine').textContent = msg;
+    else toast(msg, true);
+    return;
+  }
+  var mode = $('modeSel').value;
+  var est = C.estimateExactWork(job);
+  var useExact = mode === 'exact' ? est.feasible : (mode === 'auto' && est.autoExact);
+  if (mode === 'exact' && !est.feasible && !silent) toast('精确枚举这里算不动（' + est.reason + '），已自动改用模拟', true);
+  var N = job.players.length;
+  state.activeIdx = job.activeIdx;
+  var iters = chooseIters(N, $('speedSel').value);
+  state.runner = useExact ? C.createExactRunner(job) : C.createMCRunner(job, iters);
+  if (state.runner.aborted) { state.runner = null; toast('手牌组合太多，改用模拟吧', true); return; }
+  state.running = true;
+  state.cancelFlag = false;
+  $('runBtn').disabled = true;
+  $('cancelBtn').disabled = false;
+  $('results').style.opacity = '1';
+  $('statusLine').textContent = (useExact ? '精确枚举（把每种可能都算一遍，无误差）' : '模拟 ' + iters.toLocaleString() + ' 次') + ' 计算中…';
+  loop();
+}
+var lastPaint = 0;
+function loop() {
+  if (state.cancelFlag) { finish(true); return; }
+  var runner = state.runner;
+  var res = runner.step(14);
+  var t = Date.now();
+  if (res.done || t - lastPaint > 100) {
+    lastPaint = t;
+    updateResults(runner);
+    $('barFill').style.width = (runner.progress() * 100).toFixed(1) + '%';
+  }
+  if (res.done) finish(false);
+  else setTimeout(loop, 0);
+}
+function finish(cancelled) {
+  state.running = false;
+  $('runBtn').disabled = false;
+  $('cancelBtn').disabled = true;
+  var runner = state.runner;
+  var acc = runner.acc;
+  var kindTxt = runner.kind === 'exact' ? '精确枚举' : '模拟';
+  var extra;
+  if (runner.kind === 'mc') {
+    var n = Math.max(1, acc.iters);
+    extra = ' ' + acc.iters.toLocaleString() + ' 次 · 误差约 ±' + (1.96 * Math.sqrt(0.25 / n) * 100).toFixed(2) + '%';
+    if (acc.failed) extra += ' · ' + acc.failed + ' 次因范围冲突跳过';
+  } else {
+    extra = ' 共 ' + acc.iters.toLocaleString() + ' 种牌面';
+  }
+  $('statusLine').textContent = (cancelled ? '已取消（部分样本）' : '计算完成') + ' · ' + kindTxt + extra;
+  if (!cancelled) $('barFill').style.width = '100%';
+  updateResults(runner);
+  if (state.pendingAuto) { state.pendingAuto = false; maybeAutoRun(); }
+}
+/* ---------------- 复盘记录（存在浏览器本地） ---------------- */
+var LOG_KEY = 'poker_decisions_v1';
+var logStoreOk = true;
+function loadLog() {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]') || []; } catch (e) { logStoreOk = false; return []; }
+}
+function saveLog() {
+  try { localStorage.setItem(LOG_KEY, JSON.stringify(state.log)); logStoreOk = true; return true; }
+  catch (e) { logStoreOk = false; return false; }
+}
+function currentNeed() {
+  var pot = parseFloat($('potInput').value);
+  var call = parseFloat($('callInput').value);
+  if (!(pot > 0) || !(call > 0)) return null;
+  return call / (pot + call) * 100;
+}
+function recordDecision(kind) {
+  var p = state.players[0];
+  if (p.type !== 'hand' || p.cards[0] === null || p.cards[1] === null) { toast('先填上你自己的两张牌，再记录这一手', true); return; }
+  var r = state.lastResult;
+  var k = r ? r.map.indexOf(0) : -1;
+  if (!r || k < 0) { toast('等胜率算出来再记录（或点一下「开始计算」）', true); return; }
+  if (!state.activeIdx || state.activeIdx.length < 2) { toast('这手牌里只有你一个人，没什么可记的', true); return; }
+  var opps = [];
+  state.activeIdx.forEach(function (i) {
+    if (i === 0) return;
+    var q = state.players[i];
+    opps.push(posInfoByKey(seatPosKey(i)).zh + '：' + (q.type === 'random' ? '随机'
+      : q.type === 'hand' ? q.cards.map(function (c) { return c === null ? '' : C.cardDisplay(c); }).join('')
+        : (q.tag ? q.tag + ' ' : '') + q.rangeText));
+  });
+  var rec = {
+    t: Date.now(),
+    cards: p.cards.map(C.cardDisplay).join(''),
+    board: state.board.filter(function (c) { return c !== null; }).map(C.cardDisplay).join(''),
+    equity: r.equity[k],
+    need: currentNeed(),
+    decision: kind,
+    opps: opps
+  };
+  var last = state.log[state.log.length - 1];
+  if (last && last.cards === rec.cards && last.board === rec.board) state.log[state.log.length - 1] = rec;
+  else state.log.push(rec);
+  var saved = saveLog();
+  toast('已记录 ' + rec.cards + (rec.board ? ' @ ' + rec.board : '（翻前）') + ' · ' + (kind === 'call' ? '我跟了' : '我弃了')
+    + (saved ? '' : '（本地存储不可用，刷新会丢）'));
+  renderLogTab();
+}
+function verdictOf(rec) {
+  if (rec.need === null || rec.need === undefined) return { cls: '', txt: '没填底池，无法评判' };
+  if (rec.decision === 'call') {
+    return rec.equity >= rec.need ? { cls: 'badge-ok', txt: '跟得对（胜率够）' } : { cls: 'badge-bad', txt: '亏钱跟注（胜率不够）' };
+  }
+  return rec.equity >= rec.need ? { cls: 'badge-warn', txt: '弃错了（其实该跟）' } : { cls: 'badge-ok', txt: '弃得对' };
+}
+function renderLogTab() {
+  var box = $('logBox');
+  if (!box) return;
+  box.innerHTML = '';
+  var logs = state.log;
+  if (!logs.length) {
+    box.appendChild(el('div', 'hint', '还没有记录。打牌时点「我跟了」或「我弃了」就会记在这里。'));
+    return;
+  }
+  var calls = logs.filter(function (r) { return r.decision === 'call'; });
+  var folds = logs.filter(function (r) { return r.decision === 'fold'; });
+  var judged = logs.filter(function (r) { return r.need !== null && r.need !== undefined; });
+  var badCalls = judged.filter(function (r) { return r.decision === 'call' && r.equity < r.need; }).length;
+  var badFolds = judged.filter(function (r) { return r.decision === 'fold' && r.equity >= r.need; }).length;
+  var head = el('div', 'logHead');
+  head.appendChild(el('div', 'logSummary', '共 ' + logs.length + ' 手 · 跟注 ' + calls.length + ' 次（亏钱跟注 ' + badCalls + ' 次） · 弃牌 ' + folds.length + ' 次（其实该跟 ' + badFolds + ' 次）'));
+  var clr = el('button', 'ghost', '清空记录');
+  var armed = false;
+  clr.addEventListener('click', function () {
+    if (!armed) { armed = true; clr.textContent = '再点一次确认清空'; return; }
+    state.log = []; saveLog(); renderLogTab();
+  });
+  head.appendChild(clr);
+  box.appendChild(head);
+  if (!logStoreOk) box.appendChild(el('div', 'hint', '注意：浏览器本地存储不可用，刷新页面记录会丢失。可以用下面的文本框复制出去保存。'));
+
+  var tb = el('table', 'log');
+  tb.innerHTML = '<tr><th>时间</th><th>我的手牌</th><th>牌面</th><th>对手</th><th>胜率 / 需要</th><th>我的决定</th><th>评判</th></tr>';
+  logs.slice().reverse().forEach(function (rec) {
+    var v = verdictOf(rec);
+    var d = new Date(rec.t);
+    var tm = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    var tr = el('tr');
+    tr.appendChild(el('td', null, tm));
+    tr.appendChild(el('td', null, rec.cards));
+    tr.appendChild(el('td', null, rec.board || '翻前'));
+    tr.appendChild(el('td', null, (rec.opps || []).join(' / ')));
+    tr.appendChild(el('td', null, rec.equity.toFixed(1) + '% / ' + (rec.need === null || rec.need === undefined ? '—' : rec.need.toFixed(1) + '%')));
+    tr.appendChild(el('td', null, rec.decision === 'call' ? '跟注' : '弃牌'));
+    tr.appendChild(el('td', v.cls, v.txt));
+    tb.appendChild(tr);
+  });
+  box.appendChild(tb);
+
+  var exp = el('button', 'ghost', '生成导出文本');
+  exp.style.marginTop = '8px';
+  exp.addEventListener('click', function () {
+    var lines = ['时间,我的手牌,牌面,对手,胜率,需要胜率,我的决定,评判'];
+    logs.forEach(function (rec) {
+      var v = verdictOf(rec);
+      lines.push([new Date(rec.t).toLocaleString(), rec.cards, rec.board || '翻前', (rec.opps || []).join(' / '),
+        rec.equity.toFixed(1) + '%', (rec.need === null || rec.need === undefined ? '' : rec.need.toFixed(1) + '%'),
+        rec.decision === 'call' ? '跟注' : '弃牌', v.txt].join(','));
+    });
+    var out = box.querySelector('.logExport');
+    if (!out) { out = el('textarea', 'logExport'); out.readOnly = true; box.appendChild(out); }
+    out.value = lines.join('\n');
+    out.select();
+    toast('已生成，Ctrl+C 复制走');
+  });
+  box.appendChild(exp);
+}
+
+/* 跟不跟决策条：把胜率和底池赔率拼成一句人话 */
+function updateDecide() {
+  var box = $('decideText');
+  box.classList.remove('stale');
+  var pot = parseFloat($('potInput').value);
+  var call = parseFloat($('callInput').value);
+  if (!(pot > 0) || !(call > 0)) {
+    box.className = 'decideText';
+    box.textContent = '填入底池和跟注额（底池=现在池子里的钱，跟注额=你要掏的钱）';
+    return;
+  }
+  var need = call / (pot + call) * 100;
+  var r = state.lastResult;
+  var k = r ? r.map.indexOf(0) : -1;
+  if (!r || k < 0) {
+    box.className = 'decideText';
+    box.textContent = '需要胜率 ' + need.toFixed(1) + '% —— 等胜率算出来就能对比';
+    return;
+  }
+  var mine = r.equity[k];
+  var diff = mine - need;
+  var base = '需要胜率 ' + need.toFixed(1) + '% · 你的胜率 ' + mine.toFixed(1) + '% → ';
+  if (diff > 3) { box.className = 'decideText go'; box.textContent = base + '建议跟注（高 ' + diff.toFixed(1) + ' 个百分点）'; }
+  else if (diff < -3) { box.className = 'decideText no'; box.textContent = base + '建议弃牌（差 ' + (-diff).toFixed(1) + ' 个百分点）'; }
+  else { box.className = 'decideText mid'; box.textContent = base + '边缘局面（差 ' + diff.toFixed(1) + ' 个百分点，看对手风格）'; }
+}
+function updateResults(runner) {
+  var acc = runner.acc;
+  var n = Math.max(1, acc.iters);
+  var map = state.activeIdx && state.activeIdx.length ? state.activeIdx : null;
+  var count = map ? map.length : state.playerCount;
+  var res = { map: map || [], equity: [], sole: [], tie: [], lose: [] };
+  for (var k = 0; k < count; k++) {
+    var so = acc.sole[k] / n * 100, ti = acc.tie[k] / n * 100;
+    res.equity.push(acc.equity[k] / n * 100);
+    res.sole.push(so);
+    res.tie.push(ti);
+    res.lose.push(Math.max(0, 100 - so - ti));
+  }
+  state.lastResult = res;
+  renderSeats();
+  renderSeatEditor();
+  updateDecide();
+
+  var html = '<table class="res"><tr><th>玩家</th><th title="包含平局平分后的综合胜率">胜率</th><th>独占胜</th><th>平局</th><th>败率</th></tr>';
+  for (var j = 0; j < count; j++) {
+    var i = map ? map[j] : j;
+    var color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+    html += '<tr><td><span class="pdot" style="background:' + color + '"></span>玩家' + (i + 1) + (i === 0 ? '（我）' : '') + '</td>'
+      + '<td class="eq" style="color:' + color + '">' + res.equity[j].toFixed(2) + '%</td>'
+      + '<td>' + res.sole[j].toFixed(2) + '%</td><td>' + res.tie[j].toFixed(2) + '%</td>'
+      + '<td style="color:#8fa2c0">' + res.lose[j].toFixed(2) + '%</td></tr>';
+  }
+  html += '</table>';
+  var folded = state.playerCount - count;
+  if (folded > 0) html += '<div class="hint" style="margin-top:6px">另有 ' + folded + ' 个座位没进池（弃牌），不参与这一手</div>';
+  $('results').innerHTML = html;
+  $('results').style.opacity = '1';
+}
+
+/* ---------------- 位置范围表 / Outs ---------------- */
+function buildPosTab() {
+  var box = $('posRows');
+  box.innerHTML = '';
+  C.POSITION_RANGES.forEach(function (pos) {
+    var row = el('div', 'posRow');
+    row.appendChild(el('div', 'posName', pos.zh + '（' + pos.key + '）'));
+    var grid = el('div', 'miniGrid');
+    var rng = C.parseRange(pos.text);
+    for (var idx = 0; idx < 169; idx++) {
+      var c = el('div', 'mc' + (rng.cells.has(idx) ? ' ' + pos.kind : ''), C.cellName(idx));
+      c.title = C.cellName(idx) + (rng.cells.has(idx) ? '（在这个范围里）' : '');
+      grid.appendChild(c);
+    }
+    row.appendChild(grid);
+    row.appendChild(el('div', 'posInfo', rng.combos.length + ' 种组合'));
+    var btn = el('button', 'ghost', '载入');
+    btn.style.padding = '3px 10px'; btn.style.fontSize = '12px';
+    btn.addEventListener('click', function () {
+      var target = +($('posTargetSel').value || 0);
+      var p = state.players[target];
+      p.type = 'range';
+      p.range = C.parseRange(pos.text);
+      p.rangeText = pos.text;
+      p.tag = pos.zh;
+      selectSeat(target);
+      renderSeats(); renderSeatEditor(); updateCardPanel(); updateGrid(); syncTopBar(); markStale();
+      toast('已把「' + pos.zh + '」的范围载入玩家' + (target + 1));
+    });
+    row.appendChild(btn);
+    box.appendChild(row);
+  });
+}
+function syncPosTargets() {
+  var sel = $('posTargetSel');
+  sel.innerHTML = '';
+  for (var i = 0; i < state.playerCount; i++) {
+    var o = document.createElement('option');
+    o.value = i; o.textContent = '玩家' + (i + 1) + (i === 0 ? '（我）' : '') + ' · ' + posInfoByKey(seatPosKey(i)).zh;
+    sel.appendChild(o);
+  }
+  sel.value = String(state.selectedSeat);
+}
+/* ③ 区里的「对手范围在这个牌面中了什么」——带缓存，免得每次重算 1300 个组合 */
+var _hitCache = { key: '', data: null };
+function renderHitArea() {
+  var box = $('hitBoxWrap');
+  if (!box) return;
+  var i = state.selectedSeat;
+  var p = state.players[i];
+  if (!p || p.type === 'folded' || p.type === 'hand') {   // 选中的是具体手牌 → 改成显示第一个在池对手
+    for (var k = 1; k < state.playerCount; k++) {
+      var q = state.players[k];
+      if (q.type === 'range' || q.type === 'random') { i = k; break; }
+    }
+  }
+  var t = state.players[i];
+  if (!t || (t.type !== 'range' && t.type !== 'random')) { box.innerHTML = ''; return; }
+  var board = state.board.filter(function (c) { return c !== null; });
+  if (board.length < 3) {
+    box.innerHTML = '<div class="hint">翻牌发出来后，这里会显示「对手范围中了什么」——用来判断你的牌够不够强。</div>';
+    return;
+  }
+  var deadKey = [];
+  for (var d = 0; d < state.playerCount; d++) {
+    if (d === i) continue;
+    var q2 = state.players[d];
+    if (q2.type === 'hand') q2.cards.forEach(function (c) { if (c !== null) deadKey.push(c); });
+  }
+  deadKey.sort();
+  var key = i + '|' + board.join(',') + '|' + deadKey.join(',') + '|' + (t.type === 'random' ? 'rand' : (t.range ? t.range.combos.length : 0));
+  if (_hitCache.key !== key) _hitCache = { key: key, data: { seat: i, stats: hitStatsFor(i) } };
+  var hit = _hitCache.data.stats;
+  box.innerHTML = '';
+  var hb = el('div', 'hitBox');
+  hb.appendChild(el('div', 'hitTitle', posInfoByKey(seatPosKey(_hitCache.data.seat)).zh + '范围在 ' + board.map(C.cardDisplay).join('') + ' 上中了什么？'));
+  [['强牌（两对以上）', hit.strong], ['顶对 / 超对', hit.toppair], ['中/小对子', hit.mid],
+   ['听牌（还没成对）', hit.draw], ['什么都没中', hit.air]].forEach(function (row) {
+    var pct = hit.total ? row[1] / hit.total * 100 : 0;
+    var line = el('div', 'hitRow');
+    line.appendChild(el('span', 'hitName', row[0]));
+    var bar = el('div', 'hitBar');
+    var fill = el('i');
+    fill.style.width = pct.toFixed(1) + '%';
+    bar.appendChild(fill);
+    line.appendChild(bar);
+    line.appendChild(el('b', 'hitPct', Math.round(pct) + '%'));
+    hb.appendChild(line);
+  });
+  if (hit.madeWithDraw) hb.appendChild(el('div', 'hint', '另外：已经成牌、还带听牌的占 ' + Math.round(hit.madeWithDraw / hit.total * 100) + '%'));
+  box.appendChild(hb);
+}
+function updateOutsTab() {   // ② 号区域 + ③ 号区域里的命中率一起刷新
+  renderOutsArea();
+  renderHitArea();
+}
+function renderOutsArea() {
+  var box = $('outsMain');
+  var p = state.players[0];
+  var hand = (p.type === 'hand') ? p.cards.filter(function (c) { return c !== null; }) : [];
+  var board = state.board.filter(function (c) { return c !== null; });
+  var res = C.computeOuts(hand, board);
+  box.innerHTML = '<div class="ttl">听牌分析 <span class="hint">（读上方「我的手牌」+「公共牌」）</span></div>';
+  if (!res.ok) {
+    box.appendChild(el('div', 'hint', res.error + '。请在上方填我方手牌和公共牌（至少 3 张）。'));
+    return;
+  }
+  function cardsRow(cards) {
+    var wrap = el('div', 'outCards');
+    cards.slice(0, 26).forEach(function (c) { wrap.appendChild(el('span', 'ocard' + (C.isRedCard(c) ? ' red' : ''), C.cardDisplay(c))); });
+    if (cards.length > 26) wrap.appendChild(el('span', 'hint', '…等共 ' + cards.length + ' 张'));
+    return wrap;
+  }
+  function kv(k, v, cls) {
+    var d = el('div', 'kv');
+    d.appendChild(el('span', 'k', k));
+    d.appendChild(el('span', 'v' + (cls ? ' ' + cls : ''), v));
+    return d;
+  }
+  box.appendChild(kv('当前牌力', res.curName));
+  box.appendChild(kv('还没发的牌', res.unseen + ' 张 · 还要发 ' + res.toCome + ' 张'));
+  if (res.draws.length === 0) {
+    box.appendChild(el('div', 'hint', '没检测到明显的听牌（同花听/顺子听）。'));
+  } else {
+    res.draws.forEach(function (d) {
+      box.appendChild(kv(d.name, d.outs + ' 张 outs → 成牌概率 ' + d.toHit.toFixed(1) + '%' + (res.toCome > 1 ? '（发完两街）' : ''), d.outs >= 8 ? 'good' : 'warn'));
+      box.appendChild(cardsRow(d.cards));
+    });
+    if (res.draws.length > 1) box.appendChild(kv('组合听牌（并集）', res.unionOuts + ' 张 → 至少成一种 ' + res.unionHit.toFixed(1) + '%', 'good'));
+  }
+  if (res.improvements.length) {
+    box.appendChild(el('div', 'ttl', '所有能让牌力变强的牌（共 ' + res.improveTotal + ' 张 → ' + res.improveHit.toFixed(1) + '%）'));
+    res.improvements.forEach(function (g) {
+      box.appendChild(kv('变成「' + g.name + '」', g.cards.length + ' 张'));
+      box.appendChild(cardsRow(g.cards));
+    });
+  }
+}
+function initTabs() {
+  document.querySelectorAll('.tabBtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.tabBtn').forEach(function (x) { x.classList.remove('active'); });
+      document.querySelectorAll('.tabPane').forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      $('tab-' + b.dataset.tab).classList.add('active');
+      if (b.dataset.tab === 'log') renderLogTab();
+    });
+  });
+}
+
+/* ---------------- 初始化 ---------------- */
+function initState() {
+  state.players = [];
+  for (var i = 0; i < 9; i++) state.players.push(newPlayer(i));
+  state.myPos = 'BB';
+  var utg = posInfoByKey('UTG');
+  state.players[1].type = 'range';
+  state.players[1].range = C.parseRange(utg.text);
+  state.players[1].rangeText = utg.text;
+  state.players[1].tag = utg.zh;
+  for (var k = 2; k < 6; k++) state.players[k].tag = '弃牌';
+  state.players[0].cards = [C.makeCard(12, 0), C.makeCard(11, 0)];
+  state.board = [C.makeCard(12, 1), C.makeCard(5, 3), C.makeCard(0, 2), null, null];
+  state.selectedSeat = 0;
+  state.focus = { kind: 'hand', pi: 0, ci: 0 };
+}
+function initPlayerCountSel() {
+  var sel = $('playerCountSel');
+  if (sel) for (var i = 2; i <= 9; i++) {
+    var o = document.createElement('option'); o.value = i; o.textContent = i + ' 人'; sel.appendChild(o);
+  }
+  if (sel) {
+    sel.value = state.playerCount;
+    sel.addEventListener('change', function () {
+      state.playerCount = +this.value;
+      if (state.selectedSeat >= state.playerCount) selectSeat(0);
+      renderSeats(); renderSeatEditor(); updateCardPanel(); updateGrid(); syncPosTargets(); markStale();
+    });
+  }
+  var mp = $('myPosSel');
+  C.POSITION_RANGES.forEach(function (p) {
+    var o = document.createElement('option');
+    o.value = p.key; o.textContent = p.zh + '（' + p.key + '）'; o.title = C.POSITION_TIPS[p.key];
+    mp.appendChild(o);
+  });
+  mp.value = state.myPos;
+  mp.addEventListener('change', function () {
+    state.myPos = this.value;
+    renderSeats(); renderSeatEditor(); syncPosTargets();
+    toast('已按「我坐' + posInfoByKey(state.myPos).zh + '」重新排好座位，看每个座位上的位置标签');
+  });
+}
+function init() {
+  initState();
+  initPlayerCountSel();
+  initTabs();
+  computeComboCounts();
+  renderCardPanel();
+  buildRangeGrid();
+  renderSeats();
+  renderSeatEditor();
+  renderBoard();
+  updateCardPanel();
+  updateGrid();
+  buildPosTab();
+  syncPosTargets();
+  syncTopBar();
+  $('runBtn').addEventListener('click', function () { run(false); });
+  $('cancelBtn').addEventListener('click', function () { state.cancelFlag = true; });
+  bindTextInput($('myHandInput'), function (inp, live) {
+    var p = state.players[0];
+    if (p.type !== 'hand') { p.type = 'hand'; }
+    var ok = applyPlayerText(0, inp.value, true, live);
+    inp.classList.toggle('bad', !ok);
+    if (!live && ok) $('boardInput').focus();   // 输完手牌 → 自动跳到公共牌
+  });
+  bindTextInput($('boardInput'), function (inp, live) {
+    var ok = applyBoardText(inp.value, true);
+    inp.classList.toggle('bad', !ok);
+    if (!live && ok) {                          // 输完公共牌 → 跳到选中座位的手牌输入框
+      var ei = $('seatEditor').querySelector('input[data-kind="player"]');
+      if (ei) ei.focus();
+    }
+  });
+  $('potInput').addEventListener('input', updateDecide);
+  $('callInput').addEventListener('input', updateDecide);
+  $('nextHandBtn').addEventListener('click', nextHand);
+  document.addEventListener('click', function () {
+    Array.prototype.slice.call(document.querySelectorAll('.posMenu.open')).forEach(function (m) { m.classList.remove('open'); });
+  });
+  bindTextInput($('situationInput'), function (inp, live) {
+    if (live) return;                       // 只在回车/失焦时生效，边打边填太乱
+    if (inp.value.trim()) applySituation(inp.value);
+  });
+  // ⚙ 设置抽屉 / 两个折叠区
+  syncFolds();
+  $('settingsBtn').addEventListener('click', function () { state.settingsOpen = !state.settingsOpen; syncFolds(); });
+  $('manualToggle').addEventListener('click', function () { state.manualOpen = !state.manualOpen; syncFolds(); });
+  ['playerCountSel', 'myPosSel', 'modeSel', 'speedSel', 'autoRun'].forEach(function (id) {
+    $(id).addEventListener('change', syncFolds);
+  });
+  // 状态行点一下 = 重新计算（自动计算被关掉时的兜底）
+  $('statusLine').addEventListener('click', function () {
+    if (state.running) return;
+    state.settingsOpen = true;
+    syncFolds();
+    run(false);
+  });
+  // 底池快捷芯片：他下注 ½ 池 / ⅔ 池 / 满池
+  Array.prototype.slice.call(document.querySelectorAll('.chip')).forEach(function (c) {
+    c.addEventListener('click', function () {
+      var f = parseFloat(c.dataset.bet);   // 按「下注前底池 100」换算（结论只看比例，和具体金额无关）
+      $('potInput').value = String(Math.round(100 * (1 + f)));
+      $('callInput').value = String(Math.round(100 * f));
+      Array.prototype.slice.call(document.querySelectorAll('.chip')).forEach(function (x) { x.classList.remove('active'); });
+      c.classList.add('active');
+      updateDecide();
+    });
+  });
+  // 键盘：P 进池 / F 弃牌 / R 随机（作用于选中座位；正在打字时不触发）
+  document.addEventListener('keydown', function (ev) {
+    var tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (ev.ctrlKey || ev.altKey || ev.metaKey) return;
+    var i = state.selectedSeat;
+    var k = ev.key.toLowerCase();
+    var seatPos = posInfoByKey(seatPosKey(i));
+    if (k === 'p') { ev.preventDefault(); applyPreset(i, { label: seatPos.zh, text: seatPos.text }); }        // P = 他加注
+    else if (k === 'c') { ev.preventDefault(); applyPreset(i, { label: '跟注', text: findAction('call').text }); }  // C = 他跟注
+    else if (k === 'f' && i > 0) { ev.preventDefault(); foldSeat(i); }                                        // F = 他弃牌
+    else if (k === 'r') { ev.preventDefault(); applyPreset(i, { label: '随机', text: '' }); }                 // R = 随机
+  });
+  state.log = loadLog();
+  renderLogTab();
+  $('logCallBtn').addEventListener('click', function () { recordDecision('call'); });
+  $('logFoldBtn').addEventListener('click', function () { recordDecision('fold'); });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var f = state.focus;
+    if (f.kind === 'hand' && state.players[f.pi] && state.players[f.pi].type === 'hand') state.players[f.pi].cards[f.ci] = null;
+    else if (f.kind === 'board') state.board[f.ci] = null;
+    else return;
+    renderSeats(); renderSeatEditor(); renderBoard(); updateCardPanel(); syncTopBar(); markStale();
+  });
+  updateOutsTab();
+  renderHitArea();
+  setTimeout(function () { run(true); }, 250);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+})();
+
+</script>
+</body>
+</html>
